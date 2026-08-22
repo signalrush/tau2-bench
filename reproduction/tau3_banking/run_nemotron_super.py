@@ -772,11 +772,23 @@ def validate_resume_manifest(
     manifest: dict[str, Any], expected_static: dict[str, Any], results_path: Path
 ) -> bool:
     """Validate a finalized manifest or identify one crash-interrupted launch."""
-    strict_keys = [key for key in expected_static if key != "execution_state"]
+    relaxed_keys = {"execution_state", "reference_config_sha256"}
+    strict_keys = [key for key in expected_static if key not in relaxed_keys]
     actual_static = {key: manifest.get(key) for key in strict_keys}
     if actual_static != {key: expected_static[key] for key in strict_keys}:
         raise NemotronRunError(
             "Resume manifest does not match the current clean runtime"
+        )
+    # The recorded reference-config digest may be the exact committed blob at
+    # the manifest's own runtime head when only modes.full differs from HEAD.
+    if manifest.get("reference_config_sha256") != expected_static.get(
+        "reference_config_sha256"
+    ) and not parity_guard.manifest_reference_config_digest_acceptable(
+        manifest.get("reference_config_sha256"),
+        ((manifest.get("execution_state") or {}).get("runtime") or {}).get("head"),
+    ):
+        raise NemotronRunError(
+            "Resume manifest reference config differs beyond the full-mode scope"
         )
     # The recorded execution state may trail the current runtime only by
     # evaluation-only commits with an unchanged embedding cache.

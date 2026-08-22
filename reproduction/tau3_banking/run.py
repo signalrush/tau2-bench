@@ -2772,6 +2772,38 @@ def _validate_resume_manifest(
                     )
                     and manifest.get("finalization_errors") is None
                 )
+            revalidatable_post_run_provenance = False
+            if (
+                status == "post_run_validation_failed"
+                and source_mode in allowed_source_modes
+                and not retryable_infrastructure_provenance
+            ):
+                post_validation = manifest.get("post_run_validation")
+                checkpoint = _load_checkpoint(results_path)
+                simulations = checkpoint["simulations"]
+                infrastructure_error_count = sum(
+                    isinstance(simulation, dict)
+                    and simulation.get("termination_reason") == "infrastructure_error"
+                    for simulation in simulations
+                )
+                # A complete, infrastructure-clean checkpoint whose post-run
+                # validation failed under the launch-time guard (for example a
+                # provenance rule that an evaluation-only commit later
+                # corrected) may be re-validated: the checkpoint bytes must be
+                # exactly the ones the failed validation saw, and the full
+                # validation battery re-runs under the current code before any
+                # completion is claimed.
+                revalidatable_post_run_provenance = (
+                    isinstance(post_validation, dict)
+                    and post_validation.get("passed") is False
+                    and infrastructure_error_count == 0
+                    and manifest.get("checkpoint_sha256") == expected_checkpoint_digest
+                    and manifest.get("exit_code") == 2
+                    and _state_matches_current_or_evaluation_delta(
+                        manifest.get("post_run_execution_state"), current_state
+                    )
+                    and manifest.get("finalization_errors") is None
+                )
             finalization_errors = manifest.get("finalization_errors")
             stored_post_digest = (manifest.get("post_run_execution_state") or {}).get(
                 "digest"
@@ -2820,6 +2852,7 @@ def _validate_resume_manifest(
                 "checkpoint_provenance": running_checkpoint_provenance
                 or finalized_checkpoint_provenance
                 or retryable_infrastructure_provenance
+                or revalidatable_post_run_provenance
                 or recoverable_finalization_failure,
                 "environment": manifest.get("environment") == expected_environment,
                 "command": command in valid_commands,

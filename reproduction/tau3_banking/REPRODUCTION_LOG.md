@@ -824,3 +824,39 @@
 - The concurrent Nemotron 97-by-2 full pass ended with mass retryable
   DeepInfra `engine_overloaded` infrastructure errors; spaced resume passes
   will retry only those records.
+
+## 2026-08-22 — single-trial full result 41/97 and failure analysis
+
+- The single-trial full run at `c3887fe` completed 97/97 simulations with
+  `user_stop`, zero infrastructure errors, exact Alibaba routes for all 2,283
+  agent responses and OpenAI routes for all 704 user responses, grading
+  integrity clean, and raw chat cost `$68.33`. The aggregate was **41/97
+  (42.27%)** against the official trial-0 slice of 54/97 (55.67%); official
+  per-trial sums never fall below 51. Its post-run validation initially
+  failed only because an evaluation-only commit landed mid-run (a repeat to
+  avoid: no commits while a guarded run executes); a `revalidatable` resume
+  branch now allows an unchanged, infrastructure-clean checkpoint to be
+  re-validated under current code.
+- Failure analysis of the nine tasks that officially pass 4/4 but failed
+  here: gold-action `call_discoverable_agent_tool` string mismatches are a
+  red herring (the official run records the same `action_match: false` on its
+  own passing trajectories; these tasks grade on DB only). The real failures
+  are behavioral: the agent computed wrong values or made wrong choices
+  (wrong credit amounts, wrong account classes) or omitted required calls
+  (an unexecuted third credit in task_073 that the agent nevertheless
+  reported to the user as applied; an unlocked-but-never-called tool in
+  task_056; a merely-grepped freeze tool in task_079). A gold-DB replay diff
+  confirmed the graders are exact. Agent completion/reasoning token
+  distributions match the official run (mean 662/509 vs 677/513), ruling out
+  provider-side reasoning degradation.
+- Interpretation: the drop concentrates on knowledge-computation tasks that
+  the ten-task gate never exercised, consistent with the accepted
+  OpenRouter-constrained non-parity (dense retrieval content differences and
+  the missing user-simulator tool harness) plus single-trial sampling
+  variance; a single sample cannot separate the two. A second single-trial
+  run (~$68) would discriminate: a repeat in the low 40s confirms a
+  systematic environment gap, a return to ~52+ points to an unlucky draw.
+- Nemotron resume validation additionally accepts a recorded
+  reference-config digest that hashes the exact committed blob at the
+  manifest's own runtime head under the modes.full-only proof, completing the
+  evaluation-only delta handling for its receipts.
