@@ -209,11 +209,19 @@ def validate_info(
         "user_info.llm_args": USER_ARGS,
         "environment_info.domain_name": "banking_knowledge",
     }
-    mismatches = {
-        field: {"expected": wanted, "actual": _nested(info, field)}
-        for field, wanted in expected.items()
-        if _nested(info, field) != wanted
-    }
+    mismatches = {}
+    for field, wanted in expected.items():
+        actual = _nested(info, field)
+        matches = actual == wanted
+        if not matches and field == "git_commit":
+            # The checkpoint may trail HEAD by evaluation-only commits.
+            try:
+                parity_guard.evaluation_only_commit_delta(actual, wanted)
+                matches = True
+            except parity_guard.RunGuardError:
+                matches = False
+        if not matches:
+            mismatches[field] = {"expected": wanted, "actual": actual}
     if mismatches:
         raise NemotronRunError(f"Checkpoint run metadata mismatch: {mismatches}")
 
@@ -682,7 +690,9 @@ def verify_smoke_manifest(
         or manifest.get("run_spec_sha256") != canonical_digest(smoke_spec)
         or manifest.get("initial_command") != expected_command
         or manifest.get("environment") != smoke_environment
-        or _nested(manifest, "execution_state.digest") != runtime.get("digest")
+        or not parity_guard._state_matches_current_or_evaluation_delta(
+            manifest.get("execution_state"), runtime
+        )
     ):
         raise NemotronRunError("Smoke manifest does not match the current full runtime")
     launches = manifest.get("launches")
@@ -728,7 +738,7 @@ def verify_smoke_manifest(
         or report.get("expected_simulation_count") != 1
         or report.get("actual_simulation_count") != 1
         or report.get("infrastructure_error_count") != 0
-        or report.get("runtime_digest") != runtime.get("digest")
+        or report.get("runtime_digest") != _nested(manifest, "execution_state.digest")
         or report.get("results_sha256") != results_sha256
         or report.get("run_spec_sha256") != canonical_digest(smoke_spec)
     ):
@@ -751,7 +761,10 @@ def verify_smoke_manifest(
         "results_sha256": results_sha256,
         "report_sha256": report_file_sha256,
         "report_digest": report.get("report_digest"),
-        "runtime_digest": runtime["digest"],
+        # Bound to the smoke's own recorded runtime state (equal to the
+        # launch-time runtime at creation), so evaluation-only commits after
+        # the smoke do not orphan an otherwise valid receipt.
+        "runtime_digest": _nested(manifest, "execution_state.digest"),
     }
 
 
@@ -759,10 +772,20 @@ def validate_resume_manifest(
     manifest: dict[str, Any], expected_static: dict[str, Any], results_path: Path
 ) -> bool:
     """Validate a finalized manifest or identify one crash-interrupted launch."""
-    actual_static = {key: manifest.get(key) for key in expected_static}
-    if actual_static != expected_static:
+    strict_keys = [key for key in expected_static if key != "execution_state"]
+    actual_static = {key: manifest.get(key) for key in strict_keys}
+    if actual_static != {key: expected_static[key] for key in strict_keys}:
         raise NemotronRunError(
             "Resume manifest does not match the current clean runtime"
+        )
+    # The recorded execution state may trail the current runtime only by
+    # evaluation-only commits with an unchanged embedding cache.
+    if not parity_guard._state_matches_current_or_evaluation_delta(
+        manifest.get("execution_state"), expected_static["execution_state"]
+    ):
+        raise NemotronRunError(
+            "Resume manifest runtime state differs beyond an evaluation-only "
+            "commit delta"
         )
     launches = manifest.get("launches")
     if not isinstance(launches, list) or not launches:
