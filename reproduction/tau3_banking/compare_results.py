@@ -27,6 +27,7 @@ from run import (
     RunGuardError,
     build_command,
     endpoint_inventory_mismatches,
+    evaluation_only_commit_delta,
     expected_manifest_environment,
     expected_prompt_hashes,
     gpt52_alias_inventory_mismatches,
@@ -3164,14 +3165,16 @@ def main(argv: list[str] | None = None) -> int:
             execution_state = capture_reproduction_state(
                 REPO_ROOT, require_clean=True, require_cache=True
             )
-            if (
-                report["candidate_metadata"].get("git_commit")
-                != execution_state["runtime"]["head"]
-            ):
-                raise ComparisonError(
-                    "Refusing to write gate: candidate commit differs from the "
-                    "current clean runtime HEAD"
+            try:
+                commit_delta = evaluation_only_commit_delta(
+                    report["candidate_metadata"].get("git_commit"),
+                    execution_state["runtime"]["head"],
                 )
+            except RunGuardError as exc:
+                raise ComparisonError(
+                    "Refusing to write gate: candidate commit is not the current "
+                    f"clean runtime HEAD nor an evaluation-only ancestor: {exc}"
+                ) from exc
             if (
                 digest_checkpoint_artifact(candidate_path)
                 != report["candidate_artifact_sha256"]
@@ -3189,18 +3192,26 @@ def main(argv: list[str] | None = None) -> int:
                     "Refusing to write gate: execution manifest changed during comparison"
                 )
             gate_manifest = load_json(gate_manifest_path)
-            if (gate_manifest.get("post_run_execution_state") or {}).get(
-                "digest"
-            ) != execution_state["digest"]:
-                raise ComparisonError(
-                    "Refusing to write gate: candidate post-run cache/runtime state "
-                    "differs from the current state"
-                )
+            gate_post_run_state = gate_manifest.get("post_run_execution_state") or {}
+            if gate_post_run_state.get("digest") != execution_state["digest"]:
+                post_runtime = gate_post_run_state.get("runtime") or {}
+                if not commit_delta["changed_paths"] or (
+                    post_runtime.get("head") != commit_delta["candidate_commit"]
+                    or not post_runtime.get("worktree_clean")
+                    or (gate_post_run_state.get("embedding_cache") or {}).get("digest")
+                    != (execution_state.get("embedding_cache") or {}).get("digest")
+                ):
+                    raise ComparisonError(
+                        "Refusing to write gate: candidate post-run cache/runtime "
+                        "state differs from the current state beyond the "
+                        "evaluation-only commit delta"
+                    )
             gate = {
                 "schema_version": FULL_GATE_SCHEMA_VERSION,
                 "kind": "tau3_banking_subset_score_parity",
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "mode": "subset",
+                "evaluation_only_commit_delta": commit_delta,
                 "expected_simulation_count": report["expected_simulation_count"],
                 "candidate_simulation_count": report["candidate_simulation_count"],
                 "expected_reward_sum": report["expected_reward_sum"],

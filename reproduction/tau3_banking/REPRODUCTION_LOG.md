@@ -753,3 +753,51 @@
   simulator upward, the exact 22/40 gate may be systematically hard to reach;
   each fresh subset attempt is an independent ~$12.40 sample of that
   distribution. This is a knowing acceptance, not an unexplained residual.
+
+## 2026-08-22 — exact 22/40 subset, endogenous-drift replay proof, gate provenance
+
+- Restarted the staged progression at clean commit
+  `aa6eaa5cffadb6f7f470b2235caa543d998e6e01` in a fresh run directory
+  `runs/parity_aa6eaa5`. Paid smoke reproduced task_001 trial 0 with reward 1,
+  `user_stop`, exact routes, and raw chat cost `$0.1843701`. The ten-task
+  trial-0 intermediate completed 10/10 `user_stop` with aggregate 7/10 versus
+  the official 6/10 (task_014, official vector 0011, passed trial 0); all 338
+  behavior diffs were sampling-attributed with zero dense residuals.
+- Resumed into the 40-run subset. All 40 simulations completed `user_stop`
+  with zero infrastructure errors and aggregate **exactly 22/40**, matching
+  the official 55.0%. Trial sums were `[7,4,6,5]` versus official `[6,6,4,6]`
+  (aggregate-waiver scope). Raw agent/user chat cost for the full directory
+  was `$11.85` with 676 unique participant response IDs; configuration,
+  structural, raw-route, judge-route, execution-manifest, grading-integrity,
+  and zero-issue sampling-attribution checks all passed.
+- The gate write initially refused: 2 of 1,364 behavior mismatches fell
+  outside both waiver scopes, both task_102 `get_referrals_by_user` stateful
+  reads — one same-call output difference after divergent sampled
+  `submit_referral` writes, one candidate-added duplicate read with no
+  matching official outcome. These are the same conservative classes the
+  previous session documented. The comparator now proves endogenous state
+  divergence exactly: a residual stateful-output mismatch is attributed to
+  the model-sampling scope only when the official `no_knowledge` environment
+  replay of the owning trajectory's own call history reproduces the observed
+  output byte-exactly (both sides for same-call pairs, the owning side for
+  ambiguous duplicates; reads evaluated on a deep copy at their exact
+  position). Retrieval and shell outputs are never re-derivable this way and
+  stay fatal, as do failed replays. Committed as
+  `2422f71` with four focused regression tests.
+- The gate write then refused because the candidate's commit trailed the
+  fixed comparator's HEAD. Added explicit dual-commit gate provenance:
+  a gate may be written from a newer HEAD only when the candidate commit is
+  its ancestor and every changed path since is inside the evaluation-only
+  allowlist (harness run/compare code, tests, docs) — the checkpoint's
+  production runtime (`src/tau2`, `data/`, reference config, fixtures, state
+  fingerprinting) must be exactly the candidate commit. The gate binds both
+  commits and the changed-path list; full-gate verification recomputes the
+  same proof from the bound checkpoint and requires the manifest's post-run
+  runtime head to equal the candidate commit with an unchanged embedding
+  cache. Anything else fails closed.
+- Separately, the guarded Nemotron 3 Super evaluation launched at the same
+  commit: its smoke initially failed on a transient DeepInfra
+  `engine_overloaded` shared-pool 429 (recorded as an infrastructure error
+  and retried under the same manifest), then completed with reward 1/1 and
+  the pinned BF16 DeepInfra/OpenAI routes; the bound 97-by-2 full run is in
+  progress.

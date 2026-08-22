@@ -3668,3 +3668,59 @@ def test_replayed_deterministic_tool_outputs_is_deterministic_and_scoped():
     assert len(outputs) == 1
     assert "referral" in str(outputs[0]).lower()
     assert all(key[2] != "KB_search_shell" for key in first)
+
+
+def test_evaluation_only_commit_delta_accepts_only_evaluation_paths(monkeypatch):
+    head = "b" * 40
+    candidate = "a" * 40
+
+    assert reproduction_run.evaluation_only_commit_delta(head, head) == {
+        "candidate_commit": head,
+        "runtime_head": head,
+        "changed_paths": [],
+    }
+
+    with pytest.raises(reproduction_run.RunGuardError, match="full git commit"):
+        reproduction_run.evaluation_only_commit_delta("short", head)
+
+    monkeypatch.setattr(reproduction_run, "git_is_ancestor", lambda a, b: False)
+    with pytest.raises(reproduction_run.RunGuardError, match="not an ancestor"):
+        reproduction_run.evaluation_only_commit_delta(candidate, head)
+
+    monkeypatch.setattr(reproduction_run, "git_is_ancestor", lambda a, b: True)
+    monkeypatch.setattr(
+        reproduction_run,
+        "git_output",
+        lambda *args: (
+            "reproduction/tau3_banking/compare_results.py\n"
+            "tests/test_tau3_banking_reproduction.py\n"
+            "reproduction/tau3_banking/REPRODUCTION_LOG.md"
+        ),
+    )
+    delta = reproduction_run.evaluation_only_commit_delta(candidate, head)
+    assert delta["candidate_commit"] == candidate
+    assert delta["runtime_head"] == head
+    assert len(delta["changed_paths"]) == 3
+
+    monkeypatch.setattr(
+        reproduction_run,
+        "git_output",
+        lambda *args: "src/tau2/environment/environment.py",
+    )
+    with pytest.raises(reproduction_run.RunGuardError, match="Runtime-affecting paths"):
+        reproduction_run.evaluation_only_commit_delta(candidate, head)
+
+    for runtime_path in (
+        "reproduction/tau3_banking/reference.json",
+        "reproduction/tau3_banking/state_fingerprint.py",
+        "reproduction/tau3_banking/full_shell_order_manifest.json",
+        "data/tau2/domains/banking_knowledge/db.json",
+        "uv.lock",
+    ):
+        monkeypatch.setattr(
+            reproduction_run, "git_output", lambda *args, p=runtime_path: p
+        )
+        with pytest.raises(
+            reproduction_run.RunGuardError, match="Runtime-affecting paths"
+        ):
+            reproduction_run.evaluation_only_commit_delta(candidate, head)

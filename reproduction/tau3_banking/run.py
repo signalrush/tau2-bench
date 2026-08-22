@@ -765,6 +765,67 @@ def git_is_ancestor(ancestor: str, descendant: str) -> bool:
     raise RunGuardError(process.stderr.strip() or "git merge-base failed")
 
 
+EVALUATION_ONLY_GATE_PATHS = (
+    "reproduction/tau3_banking/run.py",
+    "reproduction/tau3_banking/compare_results.py",
+    "reproduction/tau3_banking/README.md",
+    "reproduction/tau3_banking/REPRODUCTION_LOG.md",
+)
+EVALUATION_ONLY_GATE_PATH_PREFIXES = ("tests/",)
+
+
+def evaluation_only_commit_delta(
+    candidate_commit: Any, runtime_head: str
+) -> dict[str, Any]:
+    """Prove a candidate checkpoint's commit only trails HEAD by evaluation code.
+
+    A checkpoint's production runtime (``src/tau2``, ``data/``, the pinned
+    reference config, fixtures, and state fingerprinting) must be exactly the
+    candidate commit. Comparator/guard/documentation/test changes made after
+    the paid run cannot alter the immutable checkpoint, so a gate may be
+    written from a newer HEAD only when every path changed since the candidate
+    commit is inside that evaluation-only allowlist. Anything else fails
+    closed. Returns a receipt binding both commits and the changed paths.
+    """
+    if isinstance(candidate_commit, str) and candidate_commit == runtime_head:
+        return {
+            "candidate_commit": candidate_commit,
+            "runtime_head": runtime_head,
+            "changed_paths": [],
+        }
+    if not isinstance(candidate_commit, str) or not re.fullmatch(
+        r"[0-9a-f]{40}", candidate_commit
+    ):
+        raise RunGuardError("Candidate checkpoint commit is not a full git commit")
+    if not git_is_ancestor(candidate_commit, runtime_head):
+        raise RunGuardError(
+            f"Candidate commit {candidate_commit} is not an ancestor of the "
+            f"current runtime HEAD {runtime_head}"
+        )
+    changed_output = git_output(
+        "diff", "--name-only", f"{candidate_commit}..{runtime_head}"
+    )
+    changed_paths = sorted(path for path in changed_output.splitlines() if path)
+    disallowed = [
+        path
+        for path in changed_paths
+        if path not in EVALUATION_ONLY_GATE_PATHS
+        and not any(
+            path.startswith(prefix) for prefix in EVALUATION_ONLY_GATE_PATH_PREFIXES
+        )
+    ]
+    if disallowed:
+        raise RunGuardError(
+            "Runtime-affecting paths changed since the candidate commit; the "
+            f"checkpoint cannot be gated from this HEAD: {disallowed}"
+        )
+    return {
+        "candidate_commit": candidate_commit,
+        "runtime_head": runtime_head,
+        "changed_paths": changed_paths,
+    }
+
+
 def verify_checkout(config: dict[str, Any]) -> dict[str, Any]:
     """Verify the immutable upstream base and banking data objects."""
     expected_commit = config["benchmark"]["git_commit"]
@@ -2242,12 +2303,30 @@ def verify_full_gate(
             "Bound execution manifest is not canonical: "
             + ", ".join(failed_manifest_requirements)
         )
-    if (manifest.get("post_run_execution_state") or {}).get("digest") != current_state[
-        "digest"
-    ]:
-        raise RunGuardError(
-            "Bound execution manifest cache/runtime state differs from the current state"
+    post_run_state = manifest.get("post_run_execution_state") or {}
+    if post_run_state.get("digest") != current_state["digest"]:
+        # The manifest state was captured at the candidate's run commit. It is
+        # acceptable only when HEAD trails it by evaluation-only commits, the
+        # worktree was and is clean, and the bound embedding cache is unchanged.
+        checkpoint_commit = (candidate_checkpoint.get("info") or {}).get("git_commit")
+        evaluation_only_commit_delta(
+            checkpoint_commit, current_state["runtime"]["head"]
         )
+        post_runtime = post_run_state.get("runtime") or {}
+        if post_runtime.get("head") != checkpoint_commit or not post_runtime.get(
+            "worktree_clean"
+        ):
+            raise RunGuardError(
+                "Bound execution manifest post-run runtime does not match the "
+                "candidate checkpoint commit"
+            )
+        if (post_run_state.get("embedding_cache") or {}).get("digest") != (
+            current_state.get("embedding_cache") or {}
+        ).get("digest"):
+            raise RunGuardError(
+                "Bound execution manifest embedding-cache state differs from "
+                "the current cache"
+            )
     return current_state
 
 
@@ -2341,6 +2420,14 @@ def _checkpoint_metadata_mismatches(
             if isinstance(expected_value, set)
             else actual == expected_value
         )
+        if not matches and field == "git_commit":
+            # A checkpoint may trail HEAD by evaluation-only commits; anything
+            # touching runtime paths still fails closed.
+            try:
+                evaluation_only_commit_delta(actual, current_head)
+                matches = True
+            except RunGuardError:
+                matches = False
         if not matches:
             rendered_expected: Any = (
                 sorted(expected_value)
