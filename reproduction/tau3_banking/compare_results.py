@@ -575,6 +575,127 @@ def _recompute_deterministic_components(
     return recomputed
 
 
+def _replayed_deterministic_tool_outputs(
+    simulation: dict[str, Any], task: Any
+) -> dict[tuple[Any, Any, Any, str], list[Any]]:
+    """Re-derive environment tool outputs from the trajectory's own history.
+
+    Mirrors ``Environment.set_state`` exactly: the official ``no_knowledge``
+    environment is initialized from the authoritative task, unknown
+    (retrieval/shell) tools are never re-derived, mutating calls are
+    re-executed in message order so state evolves identically, and
+    non-mutating reads are evaluated against a deep copy of the reconstructed
+    state at their exact position. Returns the re-derived, normalized output
+    content per exact call identity in occurrence order. Any failure to
+    re-derive leaves the corresponding identity absent, which downstream
+    treats as unverifiable (fatal), never as waivable.
+    """
+    from copy import deepcopy
+
+    from pydantic import TypeAdapter
+
+    from tau2.data_model.message import AssistantMessage, Message, UserMessage
+    from tau2.domains.banking_knowledge.environment import get_environment
+    from tau2.runner.build import _derive_read_log_allowlist
+
+    messages = TypeAdapter(list[Message]).validate_python(
+        simulation.get("messages") or []
+    )
+    environment = get_environment(
+        retrieval_variant="no_knowledge",
+        task=task,
+        read_log_allowlist=_derive_read_log_allowlist(task),
+    )
+    initial_state = getattr(task, "initial_state", None)
+    # Apply exactly the initialization that Environment.set_state performs,
+    # with an empty history so only task initialization runs.
+    environment.set_state(
+        getattr(initial_state, "initialization_data", None),
+        getattr(initial_state, "initialization_actions", None),
+        [],
+        strict=True,
+    )
+    replayed: dict[tuple[Any, Any, Any, str], list[Any]] = {}
+    for message in messages:
+        if not isinstance(message, (AssistantMessage, UserMessage)):
+            continue
+        if not message.is_tool_call():
+            continue
+        for tool_call in message.tool_calls:
+            if not environment._has_tool(tool_call.name):
+                continue
+            signature = (
+                message.role,
+                tool_call.requestor,
+                tool_call.name,
+                json.dumps(
+                    tool_call.arguments,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    default=repr,
+                ),
+            )
+            if environment._is_mutating_tool(tool_call.name):
+                response = environment.get_response(deepcopy(tool_call))
+            else:
+                response = deepcopy(environment).get_response(deepcopy(tool_call))
+            replayed.setdefault(signature, []).append(
+                normalize_tool_output(response.content)
+            )
+    return replayed
+
+
+def _lazy_tool_output_replay(simulation: dict[str, Any], task: Any):
+    """Memoize one trajectory replay; unavailable or failed replays verify nothing."""
+    if task is None:
+        return None
+    state: dict[str, Any] = {}
+
+    def provider() -> dict[tuple[Any, Any, Any, str], list[Any]]:
+        if "outputs" not in state:
+            try:
+                state["outputs"] = _replayed_deterministic_tool_outputs(
+                    simulation, task
+                )
+            except Exception:
+                state["outputs"] = {}
+        return state["outputs"]
+
+    return provider
+
+
+def _group_occurrence_index(
+    group: list[tuple[int, dict[str, Any]]], call_index: int
+) -> int | None:
+    for occurrence, (index, _) in enumerate(group):
+        if index == call_index:
+            return occurrence
+    return None
+
+
+def _endogenous_output_reproduced(
+    replay_provider,
+    signature: tuple[Any, Any, Any, str],
+    occurrence: int | None,
+    call: dict[str, Any],
+) -> bool:
+    """Whether the offline environment replay reproduces this exact output."""
+    if replay_provider is None or occurrence is None:
+        return False
+    if not call.get("output_present"):
+        return False
+    outputs = replay_provider().get(signature) or []
+    return occurrence < len(outputs) and outputs[occurrence] == call.get("output")
+
+
+ENDOGENOUS_STATE_DIVERGENCE_NOTE = (
+    "Endogenous state divergence: the official offline environment replay of "
+    "this trajectory's own call history reproduces this output exactly, so the "
+    "difference is caused by upstream model-sampled calls, not the backend."
+)
+
+
 def sampling_score_attribution_issues(
     expected: dict[str, Any],
     actual: dict[str, Any],
@@ -1154,6 +1275,9 @@ def compare_aligned_tool_outputs(
     model_sampling_drift_counts: Counter[str],
     mismatch_details: list[dict[str, Any]],
     max_details: int,
+    *,
+    expected_replay=None,
+    actual_replay=None,
 ) -> None:
     """Compare tool results by exact call identity, independent of call position.
 
@@ -1161,7 +1285,12 @@ def compare_aligned_tool_outputs(
     indexes. Exact call identities are therefore aligned first. Equal-size
     groups of duplicate identities retain occurrence order because stateful
     repeated calls can legitimately return a sequence of different results.
-    Duplicate identities with ambiguous non-matching results fail conservatively.
+    Duplicate identities with ambiguous non-matching results fail conservatively
+    unless the official offline environment replay of the owning trajectory's
+    own call history reproduces the observed output byte-exactly, which proves
+    the divergence is endogenous (caused by upstream model-sampled calls) and
+    therefore inside the model-sampling waiver scope. Retrieval and shell
+    outputs are never re-derivable this way and always stay fatal.
     """
     expected_groups: dict[
         tuple[Any, Any, Any, str], list[tuple[int, dict[str, Any]]]
@@ -1276,6 +1405,21 @@ def compare_aligned_tool_outputs(
                         and expected_call["name"] == "KB_search_dense"
                         else "tool_output"
                     )
+                    endogenous = (
+                        mismatch_kind == "tool_output"
+                        and _endogenous_output_reproduced(
+                            actual_replay,
+                            signature,
+                            _group_occurrence_index(actual_group, actual_index),
+                            actual_call,
+                        )
+                        and _endogenous_output_reproduced(
+                            expected_replay,
+                            signature,
+                            _group_occurrence_index(expected_group, expected_index),
+                            expected_call,
+                        )
+                    )
                     add_mismatch(
                         mismatch_counts,
                         mismatch_details,
@@ -1287,7 +1431,14 @@ def compare_aligned_tool_outputs(
                         tool=tool,
                         expected=tool_output_diagnostic(expected_call["output"]),
                         actual=tool_output_diagnostic(actual_call["output"]),
+                        **(
+                            {"note": ENDOGENOUS_STATE_DIVERGENCE_NOTE}
+                            if endogenous
+                            else {}
+                        ),
                     )
+                    if endogenous:
+                        model_sampling_drift_counts["tool_output"] += 1
 
         remaining_expected = unmatched_expected[paired_count:]
         remaining_actual = unmatched_actual[paired_count:]
@@ -1302,6 +1453,12 @@ def compare_aligned_tool_outputs(
                     for _, actual_call in actual_group
                 )
             )
+            endogenous = ambiguous_duplicate and _endogenous_output_reproduced(
+                expected_replay,
+                signature,
+                _group_occurrence_index(expected_group, expected_index),
+                expected_call,
+            )
             add_mismatch(
                 mismatch_counts,
                 mismatch_details,
@@ -1311,12 +1468,14 @@ def compare_aligned_tool_outputs(
                 expected_call_index=expected_index,
                 tool=f"{expected_call['role']}:{expected_call['name']}",
                 note=(
-                    "Ambiguous duplicate call has no matching result"
+                    ENDOGENOUS_STATE_DIVERGENCE_NOTE
+                    if endogenous
+                    else "Ambiguous duplicate call has no matching result"
                     if ambiguous_duplicate
                     else "Model-selected call is absent from the candidate"
                 ),
             )
-            if not ambiguous_duplicate:
+            if not ambiguous_duplicate or endogenous:
                 model_sampling_drift_counts["tool_output_missing"] += 1
         for actual_index, actual_call in remaining_actual:
             if not actual_call["output_present"]:
@@ -1324,6 +1483,12 @@ def compare_aligned_tool_outputs(
             ambiguous_duplicate = bool(expected_group) and not any(
                 _same_tool_outcome(expected_call, actual_call)
                 for _, expected_call in expected_group
+            )
+            endogenous = ambiguous_duplicate and _endogenous_output_reproduced(
+                actual_replay,
+                signature,
+                _group_occurrence_index(actual_group, actual_index),
+                actual_call,
             )
             add_mismatch(
                 mismatch_counts,
@@ -1335,12 +1500,14 @@ def compare_aligned_tool_outputs(
                 tool=f"{actual_call['role']}:{actual_call['name']}",
                 actual=tool_output_diagnostic(actual_call["output"]),
                 note=(
-                    "Ambiguous duplicate call has no matching result"
+                    ENDOGENOUS_STATE_DIVERGENCE_NOTE
+                    if endogenous
+                    else "Ambiguous duplicate call has no matching result"
                     if ambiguous_duplicate
                     else "Model selected an additional call"
                 ),
             )
-            if not ambiguous_duplicate:
+            if not ambiguous_duplicate or endogenous:
                 model_sampling_drift_counts["tool_output_unexpected"] += 1
 
 
@@ -1599,6 +1766,7 @@ def compare(
                     actual=actual_call["arguments"],
                 )
                 model_sampling_drift_counts["tool_call_arguments"] += 1
+        replay_task = tasks.get(key[0]) if isinstance(tasks, dict) else None
         compare_aligned_tool_outputs(
             expected_calls,
             actual_calls,
@@ -1607,6 +1775,8 @@ def compare(
             model_sampling_drift_counts,
             mismatch_details,
             max_details,
+            expected_replay=_lazy_tool_output_replay(expected, replay_task),
+            actual_replay=_lazy_tool_output_replay(actual, replay_task),
         )
         for output in expected_unpaired_outputs:
             add_mismatch(

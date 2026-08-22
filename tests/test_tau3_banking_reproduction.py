@@ -3468,3 +3468,203 @@ def test_paid_run_rejects_non_positive_or_non_finite_cost_ceiling(
 
     assert exit_code == 2
     assert "positive finite number" in capsys.readouterr().err
+
+
+def _aligned_output_call(
+    *,
+    role: str = "assistant",
+    name: str = "get_referrals_by_user",
+    arguments: dict | None = None,
+    output: str = "records",
+) -> dict:
+    arguments = arguments if arguments is not None else {"user_id": "nk80d5r2j7"}
+    return {
+        "role": role,
+        "requestor": role,
+        "name": name,
+        "arguments": arguments,
+        "output_present": True,
+        "output": output,
+        "output_requestor": role,
+        "output_error": False,
+    }
+
+
+def _replay_provider(outputs_by_signature: dict) -> object:
+    return lambda: outputs_by_signature
+
+
+def _signature_of(call: dict) -> tuple:
+    return compare_results._tool_call_signature(call)
+
+
+def _run_aligned(expected_calls, actual_calls, **kwargs):
+    from collections import Counter
+
+    mismatch_counts: Counter[str] = Counter()
+    sampling_counts: Counter[str] = Counter()
+    details: list[dict] = []
+    compare_results.compare_aligned_tool_outputs(
+        expected_calls,
+        actual_calls,
+        ("task_102", 2),
+        mismatch_counts,
+        sampling_counts,
+        details,
+        100,
+        **kwargs,
+    )
+    return mismatch_counts, sampling_counts, details
+
+
+def test_endogenous_same_call_output_drift_requires_both_side_replay_proof():
+    expected = _aligned_output_call(output="official records")
+    actual = _aligned_output_call(output="candidate records")
+    signature = _signature_of(expected)
+
+    both_proven = _run_aligned(
+        [expected],
+        [actual],
+        expected_replay=_replay_provider({signature: ["official records"]}),
+        actual_replay=_replay_provider({signature: ["candidate records"]}),
+    )
+    assert both_proven[0]["tool_output"] == 1
+    assert both_proven[1]["tool_output"] == 1
+    assert both_proven[2][0]["note"] == (
+        compare_results.ENDOGENOUS_STATE_DIVERGENCE_NOTE
+    )
+
+    candidate_unproven = _run_aligned(
+        [expected],
+        [actual],
+        expected_replay=_replay_provider({signature: ["official records"]}),
+        actual_replay=_replay_provider({signature: ["tampered records"]}),
+    )
+    assert candidate_unproven[0]["tool_output"] == 1
+    assert candidate_unproven[1]["tool_output"] == 0
+
+    expected_unproven = _run_aligned(
+        [expected],
+        [actual],
+        expected_replay=_replay_provider({signature: ["tampered records"]}),
+        actual_replay=_replay_provider({signature: ["candidate records"]}),
+    )
+    assert expected_unproven[1]["tool_output"] == 0
+
+    no_provider = _run_aligned([expected], [actual])
+    assert no_provider[1]["tool_output"] == 0
+
+
+def test_endogenous_replay_never_covers_shell_or_unknown_tools():
+    expected = _aligned_output_call(
+        name="KB_search_shell", arguments={"command": "ls"}, output="official"
+    )
+    actual = _aligned_output_call(
+        name="KB_search_shell", arguments={"command": "ls"}, output="candidate"
+    )
+    # A shell tool is unknown to the no_knowledge replay environment, so the
+    # provider has no entry for it and the mismatch must stay unwaived.
+    counts, sampling, _ = _run_aligned(
+        [expected],
+        [actual],
+        expected_replay=_replay_provider({}),
+        actual_replay=_replay_provider({}),
+    )
+    assert counts["tool_output"] == 1
+    assert sampling["tool_output"] == 0
+
+
+def test_endogenous_ambiguous_duplicate_read_uses_owning_side_replay():
+    official_read = _aligned_output_call(output="official records")
+    candidate_first = _aligned_output_call(output="official records")
+    candidate_added = _aligned_output_call(output="records with new referral")
+    signature = _signature_of(official_read)
+
+    proven = _run_aligned(
+        [official_read],
+        [candidate_first, candidate_added],
+        expected_replay=_replay_provider({signature: ["official records"]}),
+        actual_replay=_replay_provider(
+            {signature: ["official records", "records with new referral"]}
+        ),
+    )
+    assert proven[0]["tool_output_unexpected"] == 1
+    assert proven[1]["tool_output_unexpected"] == 1
+
+    unproven = _run_aligned(
+        [official_read],
+        [candidate_first, candidate_added],
+        expected_replay=_replay_provider({signature: ["official records"]}),
+        actual_replay=_replay_provider(
+            {signature: ["official records", "something else"]}
+        ),
+    )
+    assert unproven[0]["tool_output_unexpected"] == 1
+    assert unproven[1]["tool_output_unexpected"] == 0
+
+    missing = _run_aligned(
+        [candidate_first, candidate_added],
+        [official_read],
+        expected_replay=_replay_provider(
+            {signature: ["official records", "records with new referral"]}
+        ),
+        actual_replay=_replay_provider({signature: ["official records"]}),
+    )
+    assert missing[0]["tool_output_missing"] == 1
+    assert missing[1]["tool_output_missing"] == 1
+
+
+def test_replayed_deterministic_tool_outputs_is_deterministic_and_scoped():
+    tasks = compare_results.load_authoritative_banking_tasks()
+    task = tasks["task_102"]
+    simulation = {
+        "messages": [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "name": "get_referrals_by_user",
+                        "arguments": {"user_id": "nk80d5r2j7"},
+                        "requestor": "assistant",
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "id": "call_1",
+                "content": "ignored during re-derivation",
+                "requestor": "assistant",
+                "error": False,
+            },
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_2",
+                        "name": "KB_search_shell",
+                        "arguments": {"command": "ls"},
+                        "requestor": "assistant",
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "id": "call_2",
+                "content": "shell output",
+                "requestor": "assistant",
+                "error": False,
+            },
+        ]
+    }
+    first = compare_results._replayed_deterministic_tool_outputs(simulation, task)
+    second = compare_results._replayed_deterministic_tool_outputs(simulation, task)
+    assert first == second
+    read_signatures = [key for key in first if key[2] == "get_referrals_by_user"]
+    assert len(read_signatures) == 1
+    outputs = first[read_signatures[0]]
+    assert len(outputs) == 1
+    assert "referral" in str(outputs[0]).lower()
+    assert all(key[2] != "KB_search_shell" for key in first)
