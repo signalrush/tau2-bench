@@ -3790,3 +3790,68 @@ def test_state_matches_current_or_evaluation_delta(monkeypatch):
     assert not reproduction_run._state_matches_current_or_evaluation_delta(
         recorded, current
     )
+
+
+def test_reference_delta_allows_only_full_mode_scope(monkeypatch):
+    head = "b" * 40
+    candidate = "a" * 40
+    base_config = {
+        "modes": {"subset": {"trials": [0]}, "full": {"trials": [0, 1, 2, 3]}},
+        "reward_vectors": {"task_001": "1101"},
+    }
+    changed_full = copy.deepcopy(base_config)
+    changed_full["modes"]["full"] = {"trials": [0]}
+    changed_subset = copy.deepcopy(base_config)
+    changed_subset["modes"]["subset"] = {"trials": [0, 1]}
+
+    def dispatch(new_config):
+        def fake_git_output(*args):
+            if args[0] == "diff":
+                return "reproduction/tau3_banking/reference.json"
+            if args[0] == "show":
+                spec = args[1]
+                config = base_config if spec.startswith(candidate) else new_config
+                return json.dumps(config)
+            raise AssertionError(args)
+
+        return fake_git_output
+
+    monkeypatch.setattr(reproduction_run, "git_is_ancestor", lambda a, b: True)
+    monkeypatch.setattr(reproduction_run, "git_output", dispatch(changed_full))
+    delta = reproduction_run.evaluation_only_commit_delta(candidate, head)
+    assert delta["changed_paths"] == ["reproduction/tau3_banking/reference.json"]
+
+    monkeypatch.setattr(reproduction_run, "git_output", dispatch(changed_subset))
+    with pytest.raises(reproduction_run.RunGuardError, match="Runtime-affecting paths"):
+        reproduction_run.evaluation_only_commit_delta(candidate, head)
+
+
+def test_manifest_reference_config_digest_acceptance(monkeypatch):
+    recorded_head = "a" * 40
+    blob = b'{"modes": {"full": {"trials": [0, 1, 2, 3]}}}'
+    digest = hashlib.sha256(blob).hexdigest()
+
+    monkeypatch.setattr(reproduction_run, "_git_show_bytes", lambda spec: blob)
+    monkeypatch.setattr(reproduction_run, "git_output", lambda *args: "c" * 40)
+    monkeypatch.setattr(
+        reproduction_run,
+        "_reference_delta_is_full_mode_only",
+        lambda a, b: True,
+    )
+    assert reproduction_run.manifest_reference_config_digest_acceptable(
+        digest, recorded_head
+    )
+    assert not reproduction_run.manifest_reference_config_digest_acceptable(
+        "0" * 64, recorded_head
+    )
+    monkeypatch.setattr(
+        reproduction_run,
+        "_reference_delta_is_full_mode_only",
+        lambda a, b: False,
+    )
+    assert not reproduction_run.manifest_reference_config_digest_acceptable(
+        digest, recorded_head
+    )
+    assert not reproduction_run.manifest_reference_config_digest_acceptable(
+        digest, None
+    )

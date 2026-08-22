@@ -2754,10 +2754,23 @@ def validate_execution_manifest(
             "execution_manifest_sha256": None,
             "bound_openrouter_endpoint_inventory": None,
         }
+    from run import manifest_reference_config_digest_acceptable
+
     manifest = load_json(manifest_path)
     candidate_head = (candidate.get("info") or {}).get("git_commit")
     runtime = (manifest.get("execution_state") or {}).get("runtime") or {}
     execution_state_digest = (manifest.get("execution_state") or {}).get("digest")
+    expected_config_digest = config_digest
+    recorded_config_digest = manifest.get("reference_config_sha256")
+    if (
+        recorded_config_digest != config_digest
+        and manifest_reference_config_digest_acceptable(
+            recorded_config_digest, runtime.get("head")
+        )
+    ):
+        # The manifest binds the committed reference config at its own run
+        # commit; only the full-mode scope may differ from the current config.
+        expected_config_digest = recorded_config_digest
     canonical_commands = [
         build_command(config, mode, candidate_path.parent, resume=resume)
         for resume in (False, True)
@@ -2773,7 +2786,7 @@ def validate_execution_manifest(
         "status": "completed",
         "exit_code": 0,
         "output_dir": str(candidate_path.parent),
-        "reference_config_sha256": config_digest,
+        "reference_config_sha256": expected_config_digest,
         "checkpoint_sha256": artifact_digest,
         "execution_state.runtime.head": candidate_head,
         "post_run_execution_state.digest": execution_state_digest,

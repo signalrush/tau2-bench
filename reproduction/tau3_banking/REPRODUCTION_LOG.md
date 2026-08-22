@@ -801,3 +801,26 @@
   and retried under the same manifest), then completed with reward 1/1 and
   the pinned BF16 DeepInfra/OpenAI routes; the bound 97-by-2 full run is in
   progress.
+
+## 2026-08-22 — owner-directed single-trial full scope
+
+- After the type-scope and manifest-provenance fixes, the subset gate was
+  rewritten and the four-trial full run launched cleanly at `6c4aa41` into
+  `runs/full_6c4aa41`. The owner then directed a cost reduction to a
+  single-trial full evaluation, and the run was interrupted by SIGINT after
+  18 completed simulations (~$6.71 raw chat cost); its manifest finalized as
+  `failed` and the directory is retained as a receipt.
+- `modes.full` now covers all 97 tasks for trial 0 only (derived seed
+  626729): expected coverage 97, expected reward sum exactly **54/97**
+  (`55.6701%`, the official trial-0 slice), credit requirement one quarter of
+  the recorded four-trial chat cost. The published `214/388` remains the
+  four-trial figure and is no longer this mode's live target.
+- Gate provenance handles the config change narrowly: a committed
+  `reference.json` delta is evaluation-only when the parsed configs differ
+  ONLY inside `modes.full` (compared from the committed blobs), and a bound
+  manifest's recorded config digest is accepted when it hashes the exact
+  committed blob at that manifest's own runtime head under the same
+  full-mode-only proof. Every other config delta still fails closed.
+- The concurrent Nemotron 97-by-2 full pass ended with mass retryable
+  DeepInfra `engine_overloaded` infrastructure errors; spaced resume passes
+  will retry only those records.

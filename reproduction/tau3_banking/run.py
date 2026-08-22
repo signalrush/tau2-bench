@@ -780,6 +780,36 @@ EVALUATION_ONLY_GATE_PATHS = (
     "reproduction/tau3_banking/REPRODUCTION_LOG.md",
 )
 EVALUATION_ONLY_GATE_PATH_PREFIXES = ("tests/",)
+REFERENCE_CONFIG_RELATIVE = "reproduction/tau3_banking/reference.json"
+
+
+def _reference_delta_is_full_mode_only(
+    candidate_commit: str, runtime_head: str
+) -> bool:
+    """Whether the committed reference config changed only inside modes.full.
+
+    The subset checkpoint's production and validation read every other part of
+    the reference config, so only the full-mode scope (trial coverage and its
+    derived expectations/cost requirement) may differ between the candidate
+    commit and the gate-writing HEAD. Comparison uses the committed blobs,
+    never the worktree.
+    """
+    try:
+        old = json.loads(
+            git_output("show", f"{candidate_commit}:{REFERENCE_CONFIG_RELATIVE}")
+        )
+        new = json.loads(
+            git_output("show", f"{runtime_head}:{REFERENCE_CONFIG_RELATIVE}")
+        )
+    except (RunGuardError, json.JSONDecodeError):
+        return False
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return False
+    for config in (old, new):
+        modes = config.get("modes")
+        if isinstance(modes, dict):
+            modes.pop("full", None)
+    return old == new
 
 
 def evaluation_only_commit_delta(
@@ -821,6 +851,10 @@ def evaluation_only_commit_delta(
         and not any(
             path.startswith(prefix) for prefix in EVALUATION_ONLY_GATE_PATH_PREFIXES
         )
+        and not (
+            path == REFERENCE_CONFIG_RELATIVE
+            and _reference_delta_is_full_mode_only(candidate_commit, runtime_head)
+        )
     ]
     if disallowed:
         raise RunGuardError(
@@ -832,6 +866,38 @@ def evaluation_only_commit_delta(
         "runtime_head": runtime_head,
         "changed_paths": changed_paths,
     }
+
+
+def _git_show_bytes(spec: str) -> bytes:
+    """Return the exact committed blob bytes for ``<commit>:<path>``."""
+    process = subprocess.run(
+        ["git", "show", spec],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+    )
+    if process.returncode:
+        raise RunGuardError(
+            process.stderr.decode(errors="replace").strip() or f"git show {spec} failed"
+        )
+    return process.stdout
+
+
+def manifest_reference_config_digest_acceptable(
+    recorded_digest: Any, recorded_head: Any
+) -> bool:
+    """Whether a manifest's reference-config digest is the exact committed blob
+    at its recorded runtime head, with only modes.full differing from HEAD."""
+    if not isinstance(recorded_digest, str) or not isinstance(recorded_head, str):
+        return False
+    try:
+        blob = _git_show_bytes(f"{recorded_head}:{REFERENCE_CONFIG_RELATIVE}")
+        current_head = git_output("rev-parse", "HEAD")
+    except RunGuardError:
+        return False
+    if hashlib.sha256(blob).hexdigest() != recorded_digest:
+        return False
+    return _reference_delta_is_full_mode_only(recorded_head, current_head)
 
 
 def _state_matches_current_or_evaluation_delta(
@@ -2316,7 +2382,11 @@ def verify_full_gate(
         "exit_code": manifest.get("exit_code") == 0,
         "output_dir": manifest.get("output_dir") == str(candidate_path.parent),
         "reference_config": manifest.get("reference_config_sha256")
-        == digest_file(config_path),
+        == digest_file(config_path)
+        or manifest_reference_config_digest_acceptable(
+            manifest.get("reference_config_sha256"),
+            ((manifest.get("execution_state") or {}).get("runtime") or {}).get("head"),
+        ),
         "environment": manifest.get("environment")
         == expected_manifest_environment(config),
         "command": tuple(manifest.get("command") or ()) in canonical_commands,
@@ -2734,7 +2804,13 @@ def _validate_resume_manifest(
                 "executed": manifest.get("dry_run") is False,
                 "output_dir": manifest.get("output_dir") == str(output_dir),
                 "reference_config": manifest.get("reference_config_sha256")
-                == expected_config_digest,
+                == expected_config_digest
+                or manifest_reference_config_digest_acceptable(
+                    manifest.get("reference_config_sha256"),
+                    ((manifest.get("execution_state") or {}).get("runtime") or {}).get(
+                        "head"
+                    ),
+                ),
                 "runtime_cache_state": _state_matches_current_or_evaluation_delta(
                     manifest.get("execution_state"), current_state
                 ),
