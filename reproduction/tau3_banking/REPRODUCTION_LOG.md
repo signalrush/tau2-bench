@@ -621,3 +621,33 @@
   checkpoint, three execution manifests, smoke/trial-0 comparisons, and detailed
   subset comparison are force-tracked as immutable receipts even though the
   general `runs/` directory remains ignored.
+
+## 2026-08-22 — Nemotron 3 Super exploratory smoke
+
+- Verified the live paid OpenRouter route for the real
+  `nvidia/nemotron-3-super-120b-a12b`. The selected endpoint was BF16
+  DeepInfra with a 262,144-token context, 16,384-token completion ceiling,
+  seed/tool support, and fallback disabled. The agent request used medium
+  reasoning (the highest explicitly supported effort), `temperature=1.0`,
+  `top_p=0.95`, and `max_tokens=16000`. The GPT-5.2 user simulator retained
+  low reasoning, OpenAI-only routing, and fallback disabled.
+
+- The guarded credit check reported `$929.9503964839969` available before the
+  call. A one-task diagnostic was launched from clean published commit
+  `e9a1d560f97a4a6381c24f9ae23cff9357a929e8`, with task `task_001`, seed
+  `626729`, concurrency one, alltools retrieval, and the pinned Modal image and
+  full shell-order fixture. This diagnostic predated the standalone runner and
+  is evidence only; the scored full run will use a new same-commit canonical
+  runner smoke.
+
+- Outcome: reward `1/1`, correct Gold Rewards Card application, DB/action
+  checks exact, `user_stop`, duration `242.79228062502807` seconds. All 26
+  generated agent responses were `nvidia/nemotron-3-super-120b-a12b` through
+  DeepInfra; all three generated user responses were `openai/gpt-5.2` through
+  OpenAI with default service tier. All 29 response IDs were unique. Serialized
+  chat cost was `$0.079370495` (`$0.069426295` agent and `$0.0099442` user).
+
+- Result SHA-256:
+  `28e319cf7cd5e475d54a1e2dddc8787303746666453c132890745802d48ba44d`.
+  Diagnostic manifest SHA-256:
+  `ad9bb8272588ce213c13e2ca0ebee722a074ec61c5438a9362468ac16a611c91`.

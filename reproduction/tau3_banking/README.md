@@ -411,3 +411,38 @@ in `reference.json`. The smoke's raw OpenRouter cost was $0.154672 agent plus
 $0.0082551 user, $0.1629271 total. The aggregate score is the reproduction
 target; the strict comparator remains essential for detecting backend drift or
 unexplained compensating task changes.
+
+## Separate Nemotron 3 Super evaluation
+
+`run_nemotron_super.py` is a separate score runner, not a Qwen parity mode. It
+evaluates the real `nvidia/nemotron-3-super-120b-a12b` on all 97 banking tasks
+for two trials (194 trajectories). The runner pins BF16 DeepInfra, medium
+reasoning, `temperature=1.0`, `top_p=0.95`, a 16,000-token output limit, the
+same GPT-5.2/OpenAI user simulator, and the same Modal/retrieval fixtures used
+above. It reserves $1 for smoke and $40 for full through the authenticated
+credit preflight; these are availability gates, not provider-side hard caps.
+
+Run a fresh same-commit smoke first:
+
+```bash
+uv run --frozen --extra knowledge python \
+  reproduction/tau3_banking/run_nemotron_super.py smoke \
+  --output-dir reproduction/tau3_banking/runs/<fresh-smoke> \
+  --execute --confirm-paid-api-calls
+```
+
+Then bind the 97-by-2 launch to that validated smoke receipt:
+
+```bash
+uv run --frozen --extra knowledge python \
+  reproduction/tau3_banking/run_nemotron_super.py full \
+  --output-dir reproduction/tau3_banking/runs/<fresh-full> \
+  --smoke-manifest \
+    reproduction/tau3_banking/runs/<fresh-smoke>/nemotron_super_manifest.json \
+  --execute --confirm-paid-api-calls
+```
+
+Use the same command with `--resume` only for that exact output directory and
+smoke manifest. The guarded manifest authenticates the clean commit, argv,
+non-secret environment, checkpoint chain, credit receipt, task/trial coverage,
+raw participant and judge routes, costs, and final report hashes.
