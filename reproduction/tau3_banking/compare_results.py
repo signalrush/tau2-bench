@@ -20,18 +20,16 @@ from typing import Any
 from run import (
     DEFAULT_MODAL_APP,
     DEFAULT_MODAL_SANDBOX_TIMEOUT,
-    DIRECT_OPENAI_NL_ASSERTIONS_MODEL,
-    DIRECT_OPENAI_RESPONSE_ID_PREFIX,
-    DIRECT_OPENAI_USER_MODEL,
     FULL_GATE_SCHEMA_VERSION,
+    GPT52_ALIAS_MODEL,
     KNOWN_DENSE_DRIFT_WAIVER_SCOPE,
     MODEL_SAMPLING_DRIFT_WAIVER_SCOPE,
-    OPENROUTER_RESPONSE_ID_PREFIX,
     RunGuardError,
     build_command,
     endpoint_inventory_mismatches,
     expected_manifest_environment,
     expected_prompt_hashes,
+    gpt52_alias_inventory_mismatches,
     verify_canonical_tau2_runtime,
 )
 from state_fingerprint import (
@@ -2025,28 +2023,19 @@ def participant_raw_response_binding_issues(
         for field in ("prompt_tokens", "completion_tokens"):
             if raw_usage.get(field) != outer_usage.get(field):
                 issue(f"usage_{field}")
+        raw_cost = raw_usage.get("cost")
         outer_cost = message.get("cost")
-        outer_cost_valid = (
-            isinstance(outer_cost, (int, float))
-            and not isinstance(outer_cost, bool)
-            and math.isfinite(float(outer_cost))
-            and float(outer_cost) >= 0.0
-        )
-        if not outer_cost_valid:
+        if (
+            not isinstance(raw_cost, (int, float))
+            or isinstance(raw_cost, bool)
+            or not math.isfinite(float(raw_cost))
+            or float(raw_cost) < 0.0
+            or not isinstance(outer_cost, (int, float))
+            or isinstance(outer_cost, bool)
+            or not math.isfinite(float(outer_cost))
+            or not math.isclose(float(raw_cost), float(outer_cost), abs_tol=1e-12)
+        ):
             issue("usage_cost")
-        elif message.get("role") == "assistant":
-            # OpenRouter serializes an authoritative usage.cost; bind it to the
-            # serialized litellm message cost. Direct-OpenAI user responses
-            # return no usage.cost, so only the message cost is bound above.
-            raw_cost = raw_usage.get("cost")
-            if (
-                not isinstance(raw_cost, (int, float))
-                or isinstance(raw_cost, bool)
-                or not math.isfinite(float(raw_cost))
-                or float(raw_cost) < 0.0
-                or not math.isclose(float(raw_cost), float(outer_cost), abs_tol=1e-12)
-            ):
-                issue("usage_cost")
     return issues
 
 
@@ -2067,12 +2056,11 @@ def validate_raw_routes(
     }
     usage_costs: dict[str, list[float]] = {"assistant": [], "user": []}
     invalid_usage_costs: Counter[str] = Counter()
-    invalid_response_id_prefixes: Counter[str] = Counter()
     raw_response_binding_issues: list[dict[str, Any]] = []
-    expected_response_id_prefixes = {
-        "assistant": OPENROUTER_RESPONSE_ID_PREFIX,
-        "user": DIRECT_OPENAI_RESPONSE_ID_PREFIX,
-    }
+    gpt52_alias_inventory_proof_mismatches = gpt52_alias_inventory_mismatches(
+        bound_endpoint_inventory
+    )
+    gpt52_alias_inventory_proven = not gpt52_alias_inventory_proof_mismatches
     for simulation in candidate["simulations"]:
         if not isinstance(simulation, dict):
             continue
@@ -2104,8 +2092,6 @@ def validate_raw_routes(
             if not isinstance(response_id, str) or not response_id.strip():
                 invalid_response_ids[role] += 1
             else:
-                if not response_id.startswith(expected_response_id_prefixes[role]):
-                    invalid_response_id_prefixes[role] += 1
                 response_id_records.append(
                     {
                         "task_id": key[0],
@@ -2126,13 +2112,7 @@ def validate_raw_routes(
                 )
             ] += 1
             usage = raw_data.get("usage")
-            if role == "assistant":
-                # OpenRouter serializes its own authoritative usage.cost.
-                raw_cost = usage.get("cost") if isinstance(usage, dict) else None
-            else:
-                # Direct OpenAI returns no usage.cost; bind the serialized
-                # litellm-computed message cost exactly like the official run.
-                raw_cost = message.get("cost")
+            raw_cost = usage.get("cost") if isinstance(usage, dict) else None
             if (
                 isinstance(raw_cost, (int, float))
                 and not isinstance(raw_cost, bool)
@@ -2144,6 +2124,7 @@ def validate_raw_routes(
                 invalid_usage_costs[role] += 1
 
     mismatches: dict[str, dict[str, Any]] = {}
+    gpt52_alias_observed = False
     for index, (route, count) in enumerate(
         sorted(routes.items(), key=lambda item: repr(item[0]))
     ):
@@ -2161,14 +2142,25 @@ def validate_raw_routes(
                 "service_tier": None,
             }
         else:
+            resolved_user_model = normalized_model
+            if isinstance(resolved_user_model, str):
+                resolved_user_model = resolved_user_model.removeprefix("openai/")
+            alias_route = normalized_model == GPT52_ALIAS_MODEL
+            gpt52_alias_observed = gpt52_alias_observed or alias_route
             valid = (
-                normalized_model == DIRECT_OPENAI_USER_MODEL
-                and provider is None
+                (
+                    resolved_user_model in {"gpt-5.2-2025-12-11", "gpt-5.2-20251211"}
+                    or (alias_route and gpt52_alias_inventory_proven)
+                )
+                and provider == "OpenAI"
                 and service_tier == "default"
             )
             expected = {
-                "model": DIRECT_OPENAI_USER_MODEL,
-                "provider": None,
+                "model": (
+                    "a dated GPT-5.2 response, or openai/gpt-5.2 only when the "
+                    "bound endpoint inventory has the exact OpenAI dated-route proof"
+                ),
+                "provider": "OpenAI",
                 "service_tier": "default",
             }
         if not valid:
@@ -2197,14 +2189,6 @@ def validate_raw_routes(
             mismatches[f"raw_routes.{role}.response_id"] = {
                 "expected": "one nonblank response ID per attributed message",
                 "actual": invalid_response_ids[role],
-            }
-        if invalid_response_id_prefixes[role]:
-            mismatches[f"raw_routes.{role}.response_id_prefix"] = {
-                "expected": (
-                    f"every {role} response ID starts with "
-                    f"{expected_response_id_prefixes[role]!r}"
-                ),
-                "actual_invalid_count": invalid_response_id_prefixes[role],
             }
         if invalid_usage_costs[role]:
             mismatches[f"raw_routes.{role}.usage_cost"] = {
@@ -2281,6 +2265,13 @@ def validate_raw_routes(
         "raw_route_response_id_sha256": hashlib.sha256(response_id_payload).hexdigest(),
         "raw_response_binding_issue_count": len(raw_response_binding_issues),
         "raw_response_binding_issues": raw_response_binding_issues,
+        "raw_route_gpt52_alias_observed": gpt52_alias_observed,
+        "raw_route_gpt52_alias_inventory_proven": (
+            gpt52_alias_inventory_proven if gpt52_alias_observed else None
+        ),
+        "raw_route_gpt52_alias_inventory_proof_mismatches": (
+            gpt52_alias_inventory_proof_mismatches if gpt52_alias_observed else {}
+        ),
         "raw_usage_cost_usd_by_role": {
             role: math.fsum(costs) for role, costs in sorted(usage_costs.items())
         },
@@ -2419,20 +2410,14 @@ def judge_raw_response_binding(
         if reconstructed != serialized:
             issues.append("serialized_nl_checks")
     usage = raw_response.get("usage")
-    prompt_tokens = usage.get("prompt_tokens") if isinstance(usage, dict) else None
-    completion_tokens = (
-        usage.get("completion_tokens") if isinstance(usage, dict) else None
-    )
-    # Direct OpenAI reports token usage without an OpenRouter-style usage.cost.
-    if not (
-        isinstance(prompt_tokens, int)
-        and not isinstance(prompt_tokens, bool)
-        and prompt_tokens > 0
-        and isinstance(completion_tokens, int)
-        and not isinstance(completion_tokens, bool)
-        and completion_tokens > 0
+    raw_cost = usage.get("cost") if isinstance(usage, dict) else None
+    if (
+        not isinstance(raw_cost, (int, float))
+        or isinstance(raw_cost, bool)
+        or not math.isfinite(float(raw_cost))
+        or float(raw_cost) < 0.0
     ):
-        issues.append("usage_tokens")
+        issues.append("usage_cost")
     return {
         "valid": not issues,
         "issues": issues,
@@ -2442,14 +2427,14 @@ def judge_raw_response_binding(
 
 
 def expected_judge_route(config: dict[str, Any]) -> dict[str, Any]:
-    """Return the exact dated direct-OpenAI route required for task 102."""
+    """Return the exact dated route required for task 102 NL scoring."""
     return {
         "requested_model": config["reproduction_transport"]["nl_assertions_model"],
-        "resolved_model": DIRECT_OPENAI_NL_ASSERTIONS_MODEL,
-        "response_model": DIRECT_OPENAI_NL_ASSERTIONS_MODEL,
-        "provider": None,
+        "resolved_model": "gpt-4.1-2025-04-14",
+        "response_model": "openai/gpt-4.1 or the exact dated response model",
+        "provider": "OpenAI",
         "service_tier": "default",
-        "response_id": f"non-empty {DIRECT_OPENAI_RESPONSE_ID_PREFIX}* string",
+        "response_id": "non-empty string",
         "response_content_sha256": "bound raw judge choice",
         "raw_response_sha256": "bound raw judge response",
     }
@@ -2469,16 +2454,17 @@ def valid_dated_task102_judge_route(
         return False
     observation = judge_route_observation(simulation, key)
     binding = judge_raw_response_binding(simulation, key)
+    resolved = _normalized_route_model(observation["resolved_model"])
+    if isinstance(resolved, str):
+        resolved = resolved.removeprefix("openai/")
     return (
         observation["requested_model"] == expected["requested_model"]
-        and _normalized_route_model(observation["resolved_model"])
-        == expected["resolved_model"]
+        and resolved == expected["resolved_model"]
         and _normalized_route_model(observation["response_model"])
-        == expected["response_model"]
+        in {"openai/gpt-4.1", "openai/gpt-4.1-2025-04-14"}
         and observation["provider"] == expected["provider"]
         and observation["service_tier"] == expected["service_tier"]
         and isinstance(observation["response_id"], str)
-        and observation["response_id"].startswith(DIRECT_OPENAI_RESPONSE_ID_PREFIX)
         and bool(observation["response_id"].strip())
         and binding["valid"]
     )
@@ -3176,6 +3162,12 @@ def main(argv: list[str] | None = None) -> int:
                     "raw_response_binding_issue_count"
                 ],
                 "raw_response_binding_issues": report["raw_response_binding_issues"],
+                "raw_route_gpt52_alias_observed": report[
+                    "raw_route_gpt52_alias_observed"
+                ],
+                "raw_route_gpt52_alias_inventory_proven": report[
+                    "raw_route_gpt52_alias_inventory_proven"
+                ],
                 "raw_usage_cost_usd_by_role": report["raw_usage_cost_usd_by_role"],
                 "raw_usage_cost_usd_total": report["raw_usage_cost_usd_total"],
                 "raw_usage_cost_message_counts": report[

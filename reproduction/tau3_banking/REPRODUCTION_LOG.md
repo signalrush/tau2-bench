@@ -727,3 +727,29 @@
   official trajectory, then restart the paid progression (smoke, trial-0,
   subset gate at exactly 22/40, acknowledged full run) in a new run directory
   bound to the new clean commit.
+
+## 2026-08-22 — OpenRouter transport reinstated by owner decision
+
+- The owner directed that all GPT-5.2/GPT-4.1/embedding access continue to use
+  the OpenRouter credential; no direct-OpenAI key will be provided. The
+  direct-OpenAI transport switch from the previous entry is therefore
+  reverted: run.py, compare_results.py, state_fingerprint.py, the harness
+  tests, and the transport block of reference.json are restored to their
+  validated states from commit f1bfcd1 (the exact code that produced the live
+  smoke, trial-0, and 40-run subset receipts). The 81-token root-cause
+  analysis remains fully documented above and stands as accepted, explicitly
+  disclosed non-parity: the OpenRouter user transport provably lacks the
+  official request's constant 81-token Chat Completions tool-harness framing
+  and the parallel tool-call capability the official user simulator exercised
+  16 times in 388 simulations.
+- Retained from the intervening work: the Modal image rebind to this
+  workspace's content-identical rebuild `im-tnDKIdJXoHwMlRrrDMB8FX` (same
+  recipe SHA-256, all 11 full-oracle residuals byte-identical) and the
+  regenerated full shell-oracle receipt with SHA-256
+  `c2fb4c7612348d40391aeb7ebb8b783046c2183c166efbb755954f2661678c1a`.
+- Consequence recorded for the aggregate-score gate: under the official
+  per-task reward vectors, the one completed live subset's 26/40 sits at the
+  94.5th percentile. If the accepted transport difference biases the user
+  simulator upward, the exact 22/40 gate may be systematically hard to reach;
+  each fresh subset attempt is an independent ~$12.40 sample of that
+  distribution. This is a knowing acceptance, not an unexplained residual.

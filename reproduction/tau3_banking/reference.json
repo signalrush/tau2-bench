@@ -86,39 +86,34 @@
   "reproduction_transport": {
     "agent_model": "openrouter/qwen/qwen3.8-max",
     "agent_route_guard": "Preserve the official xhigh-only request args and refuse paid execution unless the sole active OpenRouter endpoint is Alibaba | qwen/qwen3.8-max-20260803.",
-    "user_transport": "direct_openai",
-    "user_model": "gpt-5.2-2025-12-11",
+    "user_model": "openrouter/openai/gpt-5.2",
     "user_llm_args": {
-      "reasoning_effort": "low"
-    },
-    "user_route_guard": "Pin the exact dated official-resolved snapshot gpt-5.2-2025-12-11 through direct OpenAI; require chatcmpl-prefixed response IDs, service_tier default, and the exact dated response model.",
-    "nl_assertions_model": "gpt-4.1-2025-04-14",
-    "nl_assertions_llm_args": {
-      "temperature": 0.0
-    },
-    "dense_embeddings_base_url": "https://api.openai.com/v1",
-    "dense_embeddings_model": "text-embedding-3-large",
-    "credential_source": "~/.rllm/config.json:api_keys.openrouter",
-    "openai_credential_source": "~/.rllm/config.json:api_keys.openai",
-    "ambient_credential_policy": "The credential file is authoritative for both providers. A present OPENROUTER_API_KEY or OPENAI_API_KEY must match its file value exactly or paid execution is rejected; ambient credentials are never preferred.",
-    "superseded_openrouter_user_transport": {
-      "user_model": "openrouter/openai/gpt-5.2",
-      "user_llm_args": {
-        "reasoning_effort": "low",
-        "extra_body": {
-          "provider": {
-            "order": [
-              "OpenAI"
-            ],
-            "allow_fallbacks": false
-          }
+      "reasoning_effort": "low",
+      "extra_body": {
+        "provider": {
+          "order": [
+            "OpenAI"
+          ],
+          "allow_fallbacks": false
         }
-      },
-      "nl_assertions_model": "openrouter/openai/gpt-4.1-2025-04-14",
-      "dense_embeddings_base_url": "https://openrouter.ai/api/v1",
-      "dense_embeddings_model": "openai/text-embedding-3-large",
-      "superseded_because": "OpenRouter's upstream OpenAI forwarding provably drops the constant 81-token Chat Completions tool-harness framing present in every official first GPT-5.2 user request (billing-verified 972 vs 1053 prompt tokens for task_001), and the official user simulator emitted parallel tool calls 16 times across 388 simulations. The official run used direct OpenAI for the user simulator, NL judge, and dense embeddings."
+      }
     },
+    "nl_assertions_model": "openrouter/openai/gpt-4.1-2025-04-14",
+    "nl_assertions_llm_args": {
+      "temperature": 0.0,
+      "extra_body": {
+        "provider": {
+          "order": [
+            "OpenAI"
+          ],
+          "allow_fallbacks": false
+        }
+      }
+    },
+    "dense_embeddings_base_url": "https://openrouter.ai/api/v1",
+    "dense_embeddings_model": "openai/text-embedding-3-large",
+    "credential_source": "~/.rllm/config.json:api_keys.openrouter",
+    "ambient_credential_policy": "The credential file is authoritative. A present OPENROUTER_API_KEY must match it exactly or paid execution is rejected; ambient credentials are never preferred.",
     "sandbox_backend": "modal",
     "modal_image_object_id": "im-tnDKIdJXoHwMlRrrDMB8FX",
     "modal_image_object_id_note": "Rebuilt content-identically (same recipe SHA-256) in Modal workspace rllm-project on 2026-08-22; the superseded macOS-session object was im-57yaJoNct9YREpBb74YQ0k. All 11 full-oracle residuals reproduced byte-identically across both builds.",
@@ -145,7 +140,7 @@
       "mismatches_reviewed_and_explicitly_accepted": true,
       "score_impact_assessment": "All 11 differences can affect model-visible tool output, downstream behavior, and benchmark score. Explicit acceptance authorizes a distribution-level Modal reproduction only; it does not establish exact trajectory parity."
     },
-    "known_non_parity": "The reproduction now routes the user simulator, NL judge, and dense embedder through direct OpenAI exactly like the official run; only the Qwen agent stays on OpenRouter, which is also the official agent transport. The official dense embedding cache remains unrecoverable, so dense score-level parity against the 2026-08-03 cache is still not guaranteed until a fresh direct-OpenAI cache comparison is recorded."
+    "known_non_parity": "The official user simulator, NL judge, and dense embedder used direct OpenAI. This reproduction routes them through OpenRouter because only that credential is in scope. The official dense embedding cache is unrecoverable and live retrieval comparisons show ranking and displayed-score drift."
   },
   "official_metrics": {
     "simulation_count": 388,

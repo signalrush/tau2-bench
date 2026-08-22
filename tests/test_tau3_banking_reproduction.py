@@ -29,14 +29,9 @@ def _attributed_message(
     cost: float,
     tool_calls: list[dict] | None = None,
 ) -> dict:
-    # Assistant responses arrive via OpenRouter/Alibaba; user responses via
-    # direct OpenAI exactly like the official run.
-    if role == "assistant":
-        model, service_tier, prefix = "qwen/qwen3.8-max", None, "gen-"
-    else:
-        model, service_tier, prefix = "gpt-5.2-2025-12-11", "default", "chatcmpl-"
-    if not response_id.startswith(prefix):
-        response_id = f"{prefix}{response_id}"
+    model = "qwen/qwen3.8-max" if role == "assistant" else "openai/gpt-5.2"
+    provider = "Alibaba" if role == "assistant" else "OpenAI"
+    service_tier = None if role == "assistant" else "default"
     raw_calls = (
         [
             {
@@ -53,33 +48,30 @@ def _attributed_message(
         else None
     )
     usage = {"prompt_tokens": 10, "completion_tokens": 2}
-    raw_usage = {**usage, "cost": cost} if role == "assistant" else dict(usage)
-    raw_data = {
-        "id": response_id,
-        "model": model,
-        "service_tier": service_tier,
-        "choices": [
-            {
-                "index": 0,
-                "finish_reason": "tool_calls" if tool_calls else "stop",
-                "message": {
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": raw_calls,
-                },
-            }
-        ],
-        "usage": raw_usage,
-    }
-    if role == "assistant":
-        raw_data["provider"] = "Alibaba"
     return {
         "role": role,
         "content": content,
         "tool_calls": tool_calls,
         "cost": cost,
         "usage": usage,
-        "raw_data": raw_data,
+        "raw_data": {
+            "id": response_id,
+            "model": model,
+            "provider": provider,
+            "service_tier": service_tier,
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "tool_calls" if tool_calls else "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": content,
+                        "tool_calls": raw_calls,
+                    },
+                }
+            ],
+            "usage": {**usage, "cost": cost},
+        },
     }
 
 
@@ -93,11 +85,10 @@ def _judge_provenance(config: dict, response_id: str, checks: list[dict]) -> dic
         for check in checks
     ]
     content = json.dumps({"results": results}, separators=(",", ":"))
-    if not response_id.startswith("chatcmpl-"):
-        response_id = f"chatcmpl-{response_id}"
     raw_response = {
         "id": response_id,
-        "model": "gpt-4.1-2025-04-14",
+        "model": "openai/gpt-4.1",
+        "provider": "OpenAI",
         "service_tier": "default",
         "choices": [
             {
@@ -110,13 +101,13 @@ def _judge_provenance(config: dict, response_id: str, checks: list[dict]) -> dic
                 },
             }
         ],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+        "usage": {"prompt_tokens": 10, "completion_tokens": 2, "cost": 0.001},
     }
     return {
         "requested_model": config["reproduction_transport"]["nl_assertions_model"],
-        "resolved_model": "gpt-4.1-2025-04-14",
-        "response_model": "gpt-4.1-2025-04-14",
-        "provider": None,
+        "resolved_model": "openai/gpt-4.1-2025-04-14",
+        "response_model": "openai/gpt-4.1",
+        "provider": "OpenAI",
         "service_tier": "default",
         "response_id": response_id,
         "raw_response": raw_response,
@@ -1362,7 +1353,7 @@ def test_judge_routes_require_unique_response_ids_and_gate_binds_observations():
         reproduction_run.full_gate_judge_route_mismatches(gate, candidate, config) == {}
     )
 
-    participant_response_id = "chatcmpl-participant-response"
+    participant_response_id = "participant-response"
     simulations[0]["messages"][0]["raw_data"] = {
         "id": participant_response_id,
         "model": "qwen/qwen3.8-max",
@@ -2095,14 +2086,11 @@ def test_paid_environment_cannot_be_redirected_by_ambient_api_bases():
             "MODAL_TOKEN_SECRET": "modal-secret",
             "UNRELATED": "preserved",
         },
-        openai_key="not-a-real-openai-key-value",
     )
 
     assert manifest["OPENROUTER_API_BASE"] == reproduction_run.OPENROUTER_BASE_URL
     assert environment["OPENROUTER_API_BASE"] == reproduction_run.OPENROUTER_BASE_URL
-    assert environment["OPENAI_BASE_URL"] == reproduction_run.OPENAI_DIRECT_BASE_URL
-    assert environment["OPENROUTER_API_KEY"] == "not-a-real-secret-key-value"
-    assert environment["OPENAI_API_KEY"] == "not-a-real-openai-key-value"
+    assert environment["OPENAI_BASE_URL"] == reproduction_run.OPENROUTER_BASE_URL
     assert "OPENAI_API_BASE" not in environment
     assert "PYTHONPATH" not in environment
     assert "PYTHONHOME" not in environment
@@ -2132,20 +2120,7 @@ def test_paid_environment_rejects_unpinned_manifest_api_base():
 
     with pytest.raises(reproduction_run.RunGuardError, match="OPENROUTER_API_BASE"):
         reproduction_run.build_paid_environment(
-            "not-a-real-secret-key-value",
-            manifest,
-            {},
-            openai_key="not-a-real-openai-key-value",
-        )
-
-    manifest["OPENROUTER_API_BASE"] = reproduction_run.OPENROUTER_BASE_URL
-    manifest["OPENAI_BASE_URL"] = "https://attacker.invalid/openai"
-    with pytest.raises(reproduction_run.RunGuardError, match="OPENAI_BASE_URL"):
-        reproduction_run.build_paid_environment(
-            "not-a-real-secret-key-value",
-            manifest,
-            {},
-            openai_key="not-a-real-openai-key-value",
+            "not-a-real-secret-key-value", manifest, {}
         )
 
 
@@ -2313,6 +2288,15 @@ def _endpoint_payload(spec: dict, *, extra_active: bool = False) -> dict:
             "status": 0,
         }
     ]
+    if spec["requested_model"] == reproduction_run.GPT52_ALIAS_MODEL:
+        endpoints.extend(copy.deepcopy(endpoints[0]) for _ in range(2))
+        endpoints.append(
+            {
+                "provider_name": "Azure",
+                "name": "Azure | openai/gpt-5.2-other-snapshot",
+                "status": 0,
+            }
+        )
     if extra_active:
         endpoints.append(
             {
@@ -2330,6 +2314,12 @@ def _bound_endpoint_inventory() -> dict:
         active_count = 1
         eligible_count = 1
         matching_count = 1
+        if spec["requested_model"] == reproduction_run.GPT52_ALIAS_MODEL:
+            active_count = reproduction_run.GPT52_ALIAS_ACTIVE_ENDPOINT_COUNT
+            eligible_count = reproduction_run.GPT52_ALIAS_ELIGIBLE_ACTIVE_ENDPOINT_COUNT
+            matching_count = reproduction_run.GPT52_ALIAS_MATCHING_ENDPOINT_COUNT
+        elif spec["requested_model"] == "openai/gpt-4.1-2025-04-14":
+            active_count = 3
         entries.append(
             {
                 "requested_model": spec["requested_model"],
@@ -2445,7 +2435,7 @@ def test_completed_resume_simulations_fail_closed_before_paid_launch(
     elif mutation == "wrong_provider":
         candidate["messages"][1]["raw_data"]["provider"] = "Azure"
     else:
-        del candidate["messages"][1]["cost"]
+        del candidate["messages"][1]["raw_data"]["usage"]["cost"]
 
     with pytest.raises(reproduction_run.RunGuardError):
         reproduction_run._validate_completed_resume_simulations(
@@ -2619,21 +2609,13 @@ def test_paid_launch_rechecks_results_and_resume_checkpoint_under_lock(
     launched = False
 
     monkeypatch.setattr(reproduction_run, "load_openrouter_key", lambda *args: "k" * 20)
-    monkeypatch.setattr(reproduction_run, "load_openai_key", lambda *args: "o" * 20)
-    monkeypatch.setattr(
-        reproduction_run,
-        "verify_openai_key_models",
-        lambda *args, **kwargs: {"models": {}},
-    )
     monkeypatch.setattr(
         reproduction_run,
         "fetch_openrouter_credit_state",
         lambda *args: {"sufficient": True},
     )
     monkeypatch.setattr(
-        reproduction_run,
-        "build_paid_environment",
-        lambda *args, **kwargs: {"PINNED": "1"},
+        reproduction_run, "build_paid_environment", lambda *args: {"PINNED": "1"}
     )
     config = {"modes": {"smoke": {"historical_chat_cost_usd": 1.0}}}
 
@@ -2697,21 +2679,13 @@ def test_cache_prewarm_rejects_commit_change_before_output_lock(monkeypatch, tmp
     output_dir.mkdir()
     results_path = output_dir / "results.json"
     monkeypatch.setattr(reproduction_run, "load_openrouter_key", lambda *args: "k" * 20)
-    monkeypatch.setattr(reproduction_run, "load_openai_key", lambda *args: "o" * 20)
-    monkeypatch.setattr(
-        reproduction_run,
-        "verify_openai_key_models",
-        lambda *args, **kwargs: {"models": {}},
-    )
     monkeypatch.setattr(
         reproduction_run,
         "fetch_openrouter_credit_state",
         lambda *args: {"sufficient": True},
     )
     monkeypatch.setattr(
-        reproduction_run,
-        "build_paid_environment",
-        lambda *args, **kwargs: {"PINNED": "1"},
+        reproduction_run, "build_paid_environment", lambda *args: {"PINNED": "1"}
     )
     monkeypatch.setattr(
         reproduction_run,
@@ -2750,21 +2724,13 @@ def test_cache_prewarm_rejects_commit_change_during_prewarm(monkeypatch, tmp_pat
     output_dir.mkdir()
     results_path = output_dir / "results.json"
     monkeypatch.setattr(reproduction_run, "load_openrouter_key", lambda *args: "k" * 20)
-    monkeypatch.setattr(reproduction_run, "load_openai_key", lambda *args: "o" * 20)
-    monkeypatch.setattr(
-        reproduction_run,
-        "verify_openai_key_models",
-        lambda *args, **kwargs: {"models": {}},
-    )
     monkeypatch.setattr(
         reproduction_run,
         "fetch_openrouter_credit_state",
         lambda *args: {"sufficient": True},
     )
     monkeypatch.setattr(
-        reproduction_run,
-        "build_paid_environment",
-        lambda *args, **kwargs: {"PINNED": "1"},
+        reproduction_run, "build_paid_environment", lambda *args: {"PINNED": "1"}
     )
     monkeypatch.setattr(
         reproduction_run,
@@ -2814,12 +2780,6 @@ def test_credit_preflight_fails_before_output_directory_or_paid_child(
 ):
     output_dir = tmp_path / "not-created"
     monkeypatch.setattr(reproduction_run, "load_openrouter_key", lambda *args: "k" * 20)
-    monkeypatch.setattr(reproduction_run, "load_openai_key", lambda *args: "o" * 20)
-    monkeypatch.setattr(
-        reproduction_run,
-        "verify_openai_key_models",
-        lambda *args, **kwargs: {"models": {}},
-    )
 
     def insufficient(*args, **kwargs):
         raise reproduction_run.RunGuardError("insufficient test credit")
@@ -3120,12 +3080,6 @@ def test_zero_exit_runner_is_finalized_only_after_checkpoint_validation(
         "sufficient": True,
     }
     monkeypatch.setattr(reproduction_run, "load_openrouter_key", lambda *args: "k" * 20)
-    monkeypatch.setattr(reproduction_run, "load_openai_key", lambda *args: "o" * 20)
-    monkeypatch.setattr(
-        reproduction_run,
-        "verify_openai_key_models",
-        lambda *args, **kwargs: {"models": {}},
-    )
 
     def credit_check(*args):
         events.append("credit")
@@ -3133,9 +3087,7 @@ def test_zero_exit_runner_is_finalized_only_after_checkpoint_validation(
 
     monkeypatch.setattr(reproduction_run, "fetch_openrouter_credit_state", credit_check)
     monkeypatch.setattr(
-        reproduction_run,
-        "build_paid_environment",
-        lambda *args, **kwargs: {"PINNED": "1"},
+        reproduction_run, "build_paid_environment", lambda *args: {"PINNED": "1"}
     )
     monkeypatch.setattr(
         reproduction_run, "capture_reproduction_state", lambda *args, **kwargs: state
@@ -3271,7 +3223,7 @@ def test_full_shell_oracle_receipt_is_pinned_reviewed_and_acknowledged(tmp_path)
         )
 
 
-def test_raw_routes_require_direct_openai_user_and_report_raw_costs():
+def test_raw_gpt52_alias_requires_exact_bound_inventory_and_reports_raw_costs():
     candidate = {
         "simulations": [
             {
@@ -3293,44 +3245,18 @@ def test_raw_routes_require_direct_openai_user_and_report_raw_costs():
     }
     keys = [("task_001", 0)]
 
+    without_proof = compare_results.validate_raw_routes(candidate, keys)
+    assert without_proof["raw_route_parity"] is False
+
     inventory = _bound_endpoint_inventory()
     report = compare_results.validate_raw_routes(candidate, keys, inventory)
     assert report["raw_route_parity"] is True
+    assert report["raw_route_gpt52_alias_inventory_proven"] is True
     assert report["raw_usage_cost_usd_by_role"] == {
         "assistant": 0.154672,
         "user": 0.0082551,
     }
     assert report["raw_usage_cost_usd_total"] == pytest.approx(0.1629271)
-
-    openrouter_user = copy.deepcopy(candidate)
-    openrouter_user["simulations"][0]["messages"][0]["raw_data"].update(
-        {
-            "id": "gen-user-response-1",
-            "model": "openai/gpt-5.2",
-            "provider": "OpenAI",
-        }
-    )
-    openrouter_user_report = compare_results.validate_raw_routes(
-        openrouter_user, keys, inventory
-    )
-    assert openrouter_user_report["raw_route_parity"] is False
-    assert any(
-        key.startswith("raw_routes.user.")
-        for key in openrouter_user_report["raw_route_mismatches"]
-    )
-
-    wrong_prefix = copy.deepcopy(candidate)
-    wrong_prefix["simulations"][0]["messages"][0]["raw_data"]["id"] = (
-        "gen-user-response-1"
-    )
-    wrong_prefix_report = compare_results.validate_raw_routes(
-        wrong_prefix, keys, inventory
-    )
-    assert wrong_prefix_report["raw_route_parity"] is False
-    assert (
-        "raw_routes.user.response_id_prefix"
-        in wrong_prefix_report["raw_route_mismatches"]
-    )
 
     swapped_raw = copy.deepcopy(candidate)
     (
@@ -3346,25 +3272,12 @@ def test_raw_routes_require_direct_openai_user_and_report_raw_costs():
     assert "raw_routes.response_binding" in swapped_report["raw_route_mismatches"]
 
     missing_cost = copy.deepcopy(candidate)
-    missing_cost["simulations"][0]["messages"][0]["cost"] = None
+    del missing_cost["simulations"][0]["messages"][0]["raw_data"]["usage"]["cost"]
     missing_cost_report = compare_results.validate_raw_routes(
         missing_cost, keys, inventory
     )
     assert missing_cost_report["raw_route_parity"] is False
     assert "raw_routes.user.usage_cost" in missing_cost_report["raw_route_mismatches"]
-
-    missing_assistant_raw_cost = copy.deepcopy(candidate)
-    del missing_assistant_raw_cost["simulations"][0]["messages"][1]["raw_data"][
-        "usage"
-    ]["cost"]
-    missing_assistant_raw_cost_report = compare_results.validate_raw_routes(
-        missing_assistant_raw_cost, keys, inventory
-    )
-    assert missing_assistant_raw_cost_report["raw_route_parity"] is False
-    assert (
-        "raw_routes.assistant.usage_cost"
-        in missing_assistant_raw_cost_report["raw_route_mismatches"]
-    )
 
     second_simulation = copy.deepcopy(candidate["simulations"][0])
     second_simulation["task_id"] = "task_002"
@@ -3385,6 +3298,13 @@ def test_raw_routes_require_direct_openai_user_and_report_raw_costs():
         in missing_coverage_report["raw_route_mismatches"]
     )
 
+    stale = copy.deepcopy(inventory)
+    stale["entries"][1]["active_endpoint_count"] += 1
+    stale["digest"] = reproduction_run.canonical_digest(stale["entries"])
+    stale_report = compare_results.validate_raw_routes(candidate, keys, stale)
+    assert stale_report["raw_route_parity"] is False
+    assert stale_report["raw_route_gpt52_alias_inventory_proven"] is False
+
     gate = {
         "raw_route_counters": report["raw_route_counters"],
         "raw_route_unattributed_generated_messages": {},
@@ -3404,8 +3324,11 @@ def test_raw_routes_require_direct_openai_user_and_report_raw_costs():
         "raw_usage_cost_usd_by_role": report["raw_usage_cost_usd_by_role"],
         "raw_usage_cost_usd_total": report["raw_usage_cost_usd_total"],
         "raw_usage_cost_message_counts": report["raw_usage_cost_message_counts"],
+        "raw_route_gpt52_alias_observed": True,
+        "raw_route_gpt52_alias_inventory_proven": True,
     }
     assert reproduction_run.full_gate_raw_route_mismatches(gate, inventory) == {}
+    assert reproduction_run.full_gate_raw_route_mismatches(gate, stale)
 
     config = json.loads((HARNESS_DIR / "reference.json").read_text(encoding="utf-8"))
     config["modes"]["subset"]["task_ids"] = ["task_001"]
@@ -3491,13 +3414,29 @@ def test_endpoint_inventory_records_and_validates_active_endpoint_counts(monkeyp
     mismatches = reproduction_run.endpoint_inventory_mismatches(stale)
     assert "qwen/qwen3.8-max.active_endpoint_count" in mismatches
 
+    stale_alias = copy.deepcopy(inventory)
+    stale_alias["entries"][1]["active_endpoint_count"] += 1
+    stale_alias["digest"] = reproduction_run.canonical_digest(stale_alias["entries"])
+    alias_mismatches = reproduction_run.endpoint_inventory_mismatches(stale_alias)
+    assert "openai/gpt-5.2.active_endpoint_count" in alias_mismatches
+
+    ineligible_snapshot = copy.deepcopy(inventory)
+    ineligible_snapshot["entries"][1]["eligible_active_endpoint_count"] += 1
+    ineligible_snapshot["digest"] = reproduction_run.canonical_digest(
+        ineligible_snapshot["entries"]
+    )
+    route_mismatches = reproduction_run.endpoint_inventory_mismatches(
+        ineligible_snapshot
+    )
+    assert "openai/gpt-5.2.eligible_active_endpoint_count" in route_mismatches
+
     impossible = _bound_endpoint_inventory()
-    impossible["entries"][0]["active_endpoint_count"] = 1
-    impossible["entries"][0]["eligible_active_endpoint_count"] = 2
-    impossible["entries"][0]["matching_active_endpoint_count"] = 2
+    impossible["entries"][2]["active_endpoint_count"] = 1
+    impossible["entries"][2]["eligible_active_endpoint_count"] = 2
+    impossible["entries"][2]["matching_active_endpoint_count"] = 2
     impossible["digest"] = reproduction_run.canonical_digest(impossible["entries"])
     count_mismatches = reproduction_run.endpoint_inventory_mismatches(impossible)
-    assert "qwen/qwen3.8-max.endpoint_count_relationship" in count_mismatches
+    assert "openai/gpt-4.1-2025-04-14.endpoint_count_relationship" in count_mismatches
 
 
 def test_endpoint_preflight_rejects_a_second_active_qwen_route(monkeypatch):
