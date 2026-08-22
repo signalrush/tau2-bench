@@ -44,11 +44,13 @@ uv run --offline --frozen --extra knowledge python \
   reproduction/tau3_banking/fetch_reference.py --verify-only
 ```
 
-The reproduction branch deliberately tracks the one selected 698-document
-OpenRouter/OpenAI embedding cache even though the upstream cache directory is
-normally ignored. The harness validates its document IDs, effective row order,
-shape `(698, 3072)`, `float64` dtype, finite values, and semantic SHA-256 before
-the first chat call. A fresh clone therefore does not need to pay to rebuild it.
+The reproduction now embeds documents through direct OpenAI exactly like the
+official run. The previously tracked OpenRouter-transport cache is retained
+only as provenance; the direct-OpenAI cache must be built once with a working
+`api_keys.openai` credential (about $0.13) and its semantic SHA-256 pinned in
+`state_fingerprint.py`, which fails closed until then. The harness validates
+document IDs, effective row order, shape `(698, 3072)`, `float64` dtype,
+finite values, and the pinned semantic SHA-256 before the first chat call.
 
 ## Cost-minimized progression
 
@@ -228,12 +230,14 @@ uv run --frozen --extra knowledge python \
 
 The pinned 2026-08-22 receipt is 4,603/4,614 unique commands exact
 (`99.76159514521024%`) across 5,135 recorded calls, with 11 complete mismatch
-details and SHA-256 `17728b8c8ae721e23506a06bd7dfe9a276009222ab17f9af0ada20ace9fd06eb`.
+details and SHA-256 `c2fb4c7612348d40391aeb7ebb8b783046c2183c166efbb755954f2661678c1a`.
 The receipt also binds Modal image-recipe SHA-256
 `fa738d7f079e0b3cfccf0c7e30f140064409afd04732eb3f5182f737f7126795`,
-hydrated image object ID `im-57yaJoNct9YREpBb74YQ0k`, the pinned
-`scipy==1.16.3` dependency, and the unprivileged runtime. Every scored sandbox
-must hydrate to that same image object ID.
+hydrated image object ID `im-tnDKIdJXoHwMlRrrDMB8FX` (workspace
+`rllm-project`; the superseded macOS-session build was
+`im-57yaJoNct9YREpBb74YQ0k` and produced byte-identical residuals), the
+pinned `scipy==1.16.3` dependency, and the unprivileged runtime. Every scored
+sandbox must hydrate to that same image object ID.
 The reviewed residuals are three traversal-order differences, four randomized
 working-directory paths, two permission-code differences, one explicit-path
 `ls` metadata difference, and one `srt` conditional-shell difference.
@@ -282,37 +286,42 @@ trajectory parity.
 ## Credential and sandbox handling
 
 `run.py` takes no key argument. For paid execution,
-`~/.rllm/config.json:api_keys.openrouter` is the authoritative credential. If
-an ambient `OPENROUTER_API_KEY` is present, it must match that file value or the
-runner refuses to start; the ambient value is never preferred. The runner never
-prints the value or writes it to the manifest. The local evaluator receives the
-same value as
-`OPENROUTER_API_KEY` and `OPENAI_API_KEY`, plus
-`OPENROUTER_API_BASE=https://openrouter.ai/api/v1` and
-`OPENAI_BASE_URL=https://openrouter.ai/api/v1`. Both transports are bound in
-the manifest and overwritten in the paid child environment, so an ambient API
-base cannot redirect model or embedding requests. The child also pins the
-committed `data/` directory, disables ignored `.env` and user-site loading, and
-removes ambient Python/uv project overrides that could silently select code,
-data, or an environment absent from the manifest. No application secrets are
-passed into Modal sandboxes.
+`~/.rllm/config.json:api_keys.openrouter` (Qwen agent) and
+`~/.rllm/config.json:api_keys.openai` (GPT-5.2 user simulator, dated GPT-4.1
+NL judge, dense embeddings) are the authoritative credentials. If an ambient
+`OPENROUTER_API_KEY` or `OPENAI_API_KEY` is present, it must match its file
+value or the runner refuses to start; ambient values are never preferred. The
+runner never prints either value or writes them to the manifest. The paid
+child receives `OPENROUTER_API_KEY` with
+`OPENROUTER_API_BASE=https://openrouter.ai/api/v1` for the agent, and the
+separate direct-OpenAI key as `OPENAI_API_KEY` with
+`OPENAI_BASE_URL=https://api.openai.com/v1` for everything else. Both
+transports are bound in the manifest and overwritten in the paid child
+environment, so an ambient API base cannot redirect model or embedding
+requests. The child also pins the committed `data/` directory, disables
+ignored `.env` and user-site loading, and removes ambient Python/uv project
+overrides that could silently select code, data, or an environment absent from
+the manifest. No application secrets are passed into Modal sandboxes.
 
-The GPT-5.2 user and dated `gpt-4.1-2025-04-14` NL judge both include an
-OpenRouter provider order of `OpenAI` with fallback disabled. This prevents a
-provider or judge-alias switch from being silently treated as parity.
-The official Qwen agent arguments remain unchanged. Before reading the API key,
-the free endpoint preflight requires that Qwen's sole active OpenRouter endpoint
-is exactly `Alibaba | qwen/qwen3.8-max-20260803`; it records both active and
-matching endpoint counts and refuses paid execution if another active route
-appears. OpenRouter currently serializes the pinned user response model as the
-moving alias `openai/gpt-5.2`. The comparator accepts that alias only when the
-bound, otherwise-valid execution manifest records the exact observed catalog
-proof: provider `OpenAI`, resolved endpoint
-`openai/gpt-5.2-20251211`, four active endpoints in total, and exactly three
-OpenAI-eligible endpoints all matching that dated snapshot. Paid preflight
-requires those same exact current counts, and a null
-raw response model is rejected. A moving alias without that proof is not
-treated as a dated route.
+The direct-OpenAI transport is deliberate and evidence-driven: every official
+first GPT-5.2 request billed exactly 81 more prompt tokens than the identical
+request through OpenRouter (972 vs 1053 for task_001, verified against
+`upstream_inference_prompt_cost` billing), a constant across different user
+toolsets that identifies the fixed Chat Completions tool-harness framing that
+OpenRouter's upstream forwarding omits, and the official user simulator
+emitted parallel tool calls 16 times across 388 simulations. No OpenRouter
+parameter restores that framing (`parallel_tool_calls` is rejected by its
+catalog for `openai/gpt-5.2`). The user model is pinned to the exact
+official-resolved snapshot `gpt-5.2-2025-12-11`; the comparator requires
+`chatcmpl-`-prefixed response IDs, the dated response model, no OpenRouter
+provider field, and `service_tier` `default` — the same raw shape the official
+artifact records. The dated `gpt-4.1-2025-04-14` judge is validated the same
+way. The official Qwen agent arguments remain unchanged. Before reading the
+API keys, the free endpoint preflight requires that Qwen's sole active
+OpenRouter endpoint is exactly `Alibaba | qwen/qwen3.8-max-20260803`, and the
+paid preflight additionally proves the direct-OpenAI key can see both pinned
+dated snapshots via free catalog reads (billing activation is proven by the
+guarded smoke itself).
 
 The runner sets:
 
@@ -321,8 +330,8 @@ TAU2_SANDBOX_BACKEND=modal
 TAU2_MODAL_APP=tau3-banking-sandboxes
 TAU2_MODAL_SANDBOX_TIMEOUT=3600
 TAU2_MODAL_ORDER_MANIFEST=reproduction/tau3_banking/full_shell_order_manifest.json
-TAU2_NL_ASSERTIONS_MODEL=openrouter/openai/gpt-4.1-2025-04-14
-TAU2_NL_ASSERTIONS_ARGS={"temperature":0.0,"extra_body":{"provider":{"order":["OpenAI"],"allow_fallbacks":false}}}
+TAU2_NL_ASSERTIONS_MODEL=gpt-4.1-2025-04-14
+TAU2_NL_ASSERTIONS_ARGS={"temperature":0.0}
 ```
 
 Each shell-using simulation gets a network-blocked, read-only Modal sandbox.
@@ -348,13 +357,16 @@ publishing or using a different fixture.
 ## Parity caveats
 
 The public official run used direct OpenAI for GPT-5.2, the GPT-4.1 NL judge,
-and dense embeddings. The available reproduction credential requires
-OpenRouter. This is a real transport difference. The official embedding cache
-could not be recovered. A fresh, consistently OpenAI-pinned OpenRouter cache
-was compared against every official dense call: 1,188/1,806 had the exact
-top-10 order, 1,787/1,806 had the same top result, mean document overlap was
-99.5238%, and 0/1,806 had all displayed scores byte-identical. Dense retrieval
-is therefore a demonstrated parity blocker, not merely a theoretical risk.
+and dense embeddings; the reproduction now uses direct OpenAI for all three,
+eliminating the OpenRouter transport difference (including the demonstrated
+constant 81-token user-request framing gap and the unavailable parallel
+tool-call harness). The official embedding cache itself could not be
+recovered. The earlier OpenAI-pinned OpenRouter cache compared against every
+official dense call gave: 1,188/1,806 exact top-10 order, 1,787/1,806 same top
+result, 99.5238% mean document overlap, and 0/1,806 byte-identical displayed
+scores. Whether a fresh direct-OpenAI cache closes that gap must be measured
+once the cache is built; until then dense retrieval remains a demonstrated
+parity risk against the 2026-08-03 official cache.
 
 The official shell used the v1.0.1 local `sandbox-runtime`; Modal is the required
 reproduction backend and is not the historical backend. The initial plain

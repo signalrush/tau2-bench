@@ -651,3 +651,79 @@
   `28e319cf7cd5e475d54a1e2dddc8787303746666453c132890745802d48ba44d`.
   Diagnostic manifest SHA-256:
   `ad9bb8272588ce213c13e2ca0ebee722a074ec61c5438a9362468ac16a611c91`.
+
+## 2026-08-22 — Linux takeover, 81-token root cause, and direct-OpenAI transport
+
+- Took over the reproduction on the Linux/WSL2 host from a fresh clone of the
+  published fork branch. Verified the `~/.rllm/config.json:api_keys.openrouter`
+  credential (same account the prior session used; sufficient credit), the
+  active `rllm-project` Modal profile, and the fetched reference artifacts.
+- Root-caused the constant 81-token first-request delta recorded for every
+  gate task. All 40 official first GPT-5.2 user requests bill exactly 81 more
+  prompt tokens than byte-identical requests through OpenRouter. Evidence:
+  - OpenRouter's `cost_details.upstream_inference_prompt_cost` divided by the
+    catalog prompt price reproduces the reported prompt token count exactly
+    (972.0 for task_001), so the delta is real billed content, not accounting.
+  - The official artifact's simulation guidelines, task JSON, greeting, and
+    persona are byte-identical to the pinned v1.0.1 data, and a tiktoken
+    reconstruction of the system prompt and greeting accounts for the request
+    to the token per toolset; the residual overhead depends only on the task's
+    user toolset and differs by exactly 81 for every distinct toolset. This
+    isolates the delta to the fixed, schema-independent Chat Completions tool
+    harness that direct OpenAI includes and OpenRouter's upstream forwarding
+    omits.
+  - A local mock-server capture proved litellm 1.81.11 sends byte-equivalent
+    request bodies for `gpt-5.2` (direct) and `openrouter/openai/gpt-5.2`, so
+    the difference is created server-side at OpenRouter.
+  - Paid micro-probes (~$0.01): replaying the exact task_001 first request via
+    OpenRouter with `parallel_tool_calls` passthrough returned the same 972
+    tokens, and `provider.require_parameters` rejected the parameter outright
+    ("No endpoints found that can handle the requested parameters"), proving
+    no OpenRouter parameter can restore the official framing.
+  - The official user simulator emitted parallel tool calls 16 times across
+    388 simulations, behavior the OpenRouter framing does not expose. Under
+    the official per-task reward vectors, the observed live subset excess
+    (26/40 vs 22/40) sits at the 94.5th percentile (P(sum >= 26) = 5.54%), so
+    a cooperative-user bias from the missing harness is a plausible mechanism
+    and the transport difference is not ignorable.
+- Switched the pinned reproduction transport for the GPT-5.2 user simulator,
+  dated GPT-4.1 NL judge, and dense embeddings to direct OpenAI (the official
+  transport), keeping the Qwen agent on OpenRouter exactly as the official
+  run did. The user model is pinned to the official-resolved dated snapshot
+  `gpt-5.2-2025-12-11`. reference.json records the superseded OpenRouter
+  transport block verbatim with the reason. run.py now loads a second
+  authoritative credential from `~/.rllm/config.json:api_keys.openai` with the
+  same ambient-match policy, pins `OPENAI_BASE_URL=https://api.openai.com/v1`
+  in the manifest and paid child, and adds a free dated-snapshot catalog
+  preflight for both pinned OpenAI models. The GPT-5.2 moving-alias catalog
+  proof machinery was removed with the transport that required it; the
+  comparator now requires the direct raw shape (dated response model, no
+  OpenRouter provider field, `chatcmpl-` response-ID prefix, service tier
+  `default`) for user and judge responses, keeps OpenRouter `usage.cost`
+  binding for the agent, and binds the serialized litellm message cost for
+  direct-OpenAI responses, which is exactly the shape the official artifact
+  records.
+- The direct-OpenAI document-embedding cache is intentionally unpinned:
+  `state_fingerprint.py` fails closed with the observed semantic SHA-256 until
+  the one-time direct cache build is reviewed and pinned. The prior
+  OpenRouter cache pin is retained as a provenance comment.
+- Regenerated the full 4,614-command Modal shell-oracle receipt in the
+  `rllm-project` workspace: 4,603/4,614 unique commands exact across 5,135
+  recorded calls with the same 11 reviewed residuals, byte-identical to the
+  prior workspace's details, from the same image recipe SHA-256
+  `fa738d7f079e0b3cfccf0c7e30f140064409afd04732eb3f5182f737f7126795` hydrated
+  as the new image object `im-tnDKIdJXoHwMlRrrDMB8FX`. reference.json rebinds
+  the image object ID and the new receipt SHA-256
+  `c2fb4c7612348d40391aeb7ebb8b783046c2183c166efbb755954f2661678c1a`; the
+  cheap strict slice also reproduced 59/59 recursive gate commands here.
+- The focused offline harness suite passes 90 tests after the transport
+  rewrite; the banking-domain offline regression selection passes end to end,
+  and Ruff check/format are clean. The offline dry smoke emits the direct
+  argv: `--user-llm gpt-5.2-2025-12-11 --user-llm-args
+  '{"reasoning_effort":"low"}'` with `TAU2_NL_ASSERTIONS_MODEL=
+  gpt-4.1-2025-04-14`.
+- Next steps require a billing-active `api_keys.openai` credential: build and
+  pin the direct embedding cache, record a fresh dense comparison against the
+  official trajectory, then restart the paid progression (smoke, trial-0,
+  subset gate at exactly 22/40, acknowledged full run) in a new run directory
+  bound to the new clean commit.

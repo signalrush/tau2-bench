@@ -22,13 +22,16 @@ RUNTIME_GIT_PATHS = (
 DEFAULT_CACHE_PATH = Path("data/.embeddings_cache")
 DOCUMENTS_PATH = Path("data/tau2/domains/banking_knowledge/documents")
 EMBEDDER_TYPE = "openai"
+# Direct-OpenAI transport: the embedder adds no ``_transport`` marker when
+# ``OPENAI_BASE_URL`` points at api.openai.com, matching the official run.
 EFFECTIVE_EMBEDDER_CONFIG = {
     "model": "text-embedding-3-large",
-    "_transport": "openrouter-openai-provider-v1",
 }
-EXPECTED_CACHE_SEMANTIC_SHA256 = (
-    "7b1668a5b9afd48edba1ef195c10b534accafb91f1da8229c91ea0c0fabb562b"
-)
+# Pinned after the one-time direct-OpenAI cache build. ``None`` fails closed:
+# no paid chat run can start until the direct cache is built and pinned here.
+EXPECTED_CACHE_SEMANTIC_SHA256: str | None = "PENDING_DIRECT_OPENAI_CACHE_PIN"
+# Superseded OpenRouter-transport cache pin, retained for provenance only:
+# 7b1668a5b9afd48edba1ef195c10b534accafb91f1da8229c91ea0c0fabb562b
 EXPECTED_DOCUMENT_COUNT = 698
 EXPECTED_EMBEDDING_SHAPE = (698, 3072)
 EXPECTED_EMBEDDING_DTYPE = "<f8"
@@ -375,6 +378,13 @@ def capture_embedding_cache(
 
     size, file_digest = _digest_stable_file(cache_file)
     semantic = _inspect_pickle(cache_file, [item["id"] for item in documents])
+    if EXPECTED_CACHE_SEMANTIC_SHA256 == "PENDING_DIRECT_OPENAI_CACHE_PIN":
+        raise StateFingerprintError(
+            "The direct-OpenAI document cache exists but its semantic SHA-256 "
+            "has not been pinned yet. Pin EXPECTED_CACHE_SEMANTIC_SHA256 in "
+            f"state_fingerprint.py to {semantic['semantic_sha256']} after "
+            "reviewing the one-time cache build."
+        )
     if semantic["semantic_sha256"] != EXPECTED_CACHE_SEMANTIC_SHA256:
         raise StateFingerprintError(
             "Selected cache semantic digest mismatch: "

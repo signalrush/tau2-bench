@@ -88,11 +88,14 @@ MODEL_SAMPLING_MISMATCH_KINDS = {
 ENDPOINT_INVENTORY_SCHEMA_VERSION = 3
 FULL_GATE_SCHEMA_VERSION = 7
 INITIAL_ASSISTANT_GREETING = "Hi! How can I help you today?"
-GPT52_ALIAS_MODEL = "openai/gpt-5.2"
-GPT52_RESOLVED_MODEL = "openai/gpt-5.2-20251211"
-GPT52_ALIAS_ACTIVE_ENDPOINT_COUNT = 4
-GPT52_ALIAS_ELIGIBLE_ACTIVE_ENDPOINT_COUNT = 3
-GPT52_ALIAS_MATCHING_ENDPOINT_COUNT = 3
+OPENAI_DIRECT_BASE_URL = "https://api.openai.com/v1"
+USER_TRANSPORT_DIRECT_OPENAI = "direct_openai"
+DIRECT_OPENAI_USER_MODEL = "gpt-5.2-2025-12-11"
+DIRECT_OPENAI_USER_LLM_ARGS = {"reasoning_effort": "low"}
+DIRECT_OPENAI_NL_ASSERTIONS_MODEL = "gpt-4.1-2025-04-14"
+DIRECT_OPENAI_NL_ASSERTIONS_LLM_ARGS = {"temperature": 0.0}
+DIRECT_OPENAI_RESPONSE_ID_PREFIX = "chatcmpl-"
+OPENROUTER_RESPONSE_ID_PREFIX = "gen-"
 ENDPOINT_INVENTORY_SPECS = (
     {
         "requested_model": "qwen/qwen3.8-max",
@@ -100,20 +103,6 @@ ENDPOINT_INVENTORY_SPECS = (
         "provider": "Alibaba",
         "resolved_model": "qwen/qwen3.8-max-20260803",
         "require_sole_active_endpoint": True,
-    },
-    {
-        "requested_model": "openai/gpt-5.2",
-        "response_model_id": "openai/gpt-5.2",
-        "provider": "OpenAI",
-        "resolved_model": "openai/gpt-5.2-20251211",
-        "require_sole_active_endpoint": False,
-    },
-    {
-        "requested_model": "openai/gpt-4.1-2025-04-14",
-        "response_model_id": "openai/gpt-4.1",
-        "provider": "OpenAI",
-        "resolved_model": "openai/gpt-4.1-2025-04-14",
-        "require_sole_active_endpoint": False,
     },
 )
 PREWARM_SCRIPT = (
@@ -224,6 +213,78 @@ def load_openrouter_key(path: Path, environment: dict[str, str]) -> str:
     return key
 
 
+def load_openai_key(path: Path, environment: dict[str, str]) -> str:
+    """Load the authoritative direct-OpenAI key for the user/judge/embeddings."""
+    config = load_json(path)
+    candidates = [
+        (config.get("api_keys") or {}).get("openai")
+        if isinstance(config.get("api_keys"), dict)
+        else None,
+        config.get("OPENAI_API_KEY"),
+        config.get("openai_api_key"),
+    ]
+    keys = [candidate for candidate in candidates if isinstance(candidate, str)]
+    if len(set(keys)) > 1:
+        raise RunGuardError(f"Multiple different OpenAI credentials found in {path}")
+    if not keys:
+        raise RunGuardError(f"No OpenAI credential found in {path}:api_keys.openai")
+    key = keys[0]
+    if len(key) < 20 or any(character.isspace() for character in key):
+        raise RunGuardError("OpenAI credential has an invalid shape")
+    ambient = environment.get("OPENAI_API_KEY")
+    if ambient is not None and not hmac.compare_digest(ambient, key):
+        raise RunGuardError(
+            "Ambient OPENAI_API_KEY conflicts with the authoritative credential file"
+        )
+    return key
+
+
+def verify_openai_key_models(
+    key: str, *, timeout_seconds: float = 20.0
+) -> dict[str, Any]:
+    """Prove the direct-OpenAI key can see both pinned dated model snapshots.
+
+    This is a free authenticated catalog read; it cannot prove billing is
+    active, so the guarded smoke remains the first paid canary.
+    """
+    checked = {}
+    for model in (DIRECT_OPENAI_USER_MODEL, DIRECT_OPENAI_NL_ASSERTIONS_MODEL):
+        request = urllib.request.Request(
+            f"{OPENAI_DIRECT_BASE_URL}/models/{model}",
+            method="GET",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {key}",
+                "User-Agent": "tau3-banking-parity-harness/1",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                raw = response.read(1024 * 1024 + 1)
+                status_code = getattr(response, "status", 200)
+        except (OSError, urllib.error.URLError):
+            raise RunGuardError(
+                f"Direct OpenAI model preflight is unavailable for {model}"
+            ) from None
+        if status_code != 200 or len(raw) > 1024 * 1024:
+            raise RunGuardError(f"Direct OpenAI model preflight failed for {model}")
+        try:
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise RunGuardError(
+                f"Direct OpenAI model preflight returned invalid JSON for {model}"
+            ) from None
+        if payload.get("id") != model:
+            raise RunGuardError(
+                f"Direct OpenAI catalog does not expose the pinned snapshot {model}"
+            )
+        checked[model] = True
+    return {
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "models": checked,
+    }
+
+
 def fetch_openrouter_credit_state(
     key: str,
     required_usd: float,
@@ -313,11 +374,29 @@ def expected_manifest_environment(
         raise RunGuardError(
             "Reference config must bind a hydrated Modal image object ID"
         )
+    transport = config["reproduction_transport"]
+    if transport.get("user_transport") != USER_TRANSPORT_DIRECT_OPENAI:
+        raise RunGuardError(
+            "Reference config must pin the direct-OpenAI user transport"
+        )
+    if (
+        transport.get("user_model") != DIRECT_OPENAI_USER_MODEL
+        or transport.get("user_llm_args") != DIRECT_OPENAI_USER_LLM_ARGS
+        or transport.get("nl_assertions_model") != DIRECT_OPENAI_NL_ASSERTIONS_MODEL
+        or transport.get("nl_assertions_llm_args")
+        != DIRECT_OPENAI_NL_ASSERTIONS_LLM_ARGS
+        or transport.get("dense_embeddings_base_url") != OPENAI_DIRECT_BASE_URL
+        or transport.get("dense_embeddings_model") != "text-embedding-3-large"
+    ):
+        raise RunGuardError(
+            "Reference config must pin the exact dated direct-OpenAI user, judge, "
+            "and embedding arguments"
+        )
     return {
         "OPENROUTER_API_KEY": "<loaded without logging>",
         "OPENROUTER_API_BASE": OPENROUTER_BASE_URL,
-        "OPENAI_API_KEY": "<same OpenRouter key for SDK compatibility>",
-        "OPENAI_BASE_URL": OPENROUTER_BASE_URL,
+        "OPENAI_API_KEY": "<direct OpenAI key loaded without logging>",
+        "OPENAI_BASE_URL": OPENAI_DIRECT_BASE_URL,
         "PYTHONUNBUFFERED": "1",
         "PYTHONNOUSERSITE": "1",
         "PYTHON_DOTENV_DISABLED": "1",
@@ -341,12 +420,21 @@ def build_paid_environment(
     key: str,
     manifest_environment: dict[str, str],
     ambient_environment: dict[str, str] | None = None,
+    *,
+    openai_key: str,
 ) -> dict[str, str]:
-    """Build a paid child environment with both OpenRouter transports pinned."""
+    """Build a paid child environment with both transports pinned.
+
+    The Qwen agent stays on OpenRouter (the official transport); the GPT-5.2
+    user simulator, dated GPT-4.1 NL judge, and dense embeddings use direct
+    OpenAI exactly like the recorded official run.
+    """
     if manifest_environment.get("OPENROUTER_API_BASE") != OPENROUTER_BASE_URL:
         raise RunGuardError("Manifest must pin OPENROUTER_API_BASE to OpenRouter")
-    if manifest_environment.get("OPENAI_BASE_URL") != OPENROUTER_BASE_URL:
-        raise RunGuardError("Manifest must pin OPENAI_BASE_URL to OpenRouter")
+    if manifest_environment.get("OPENAI_BASE_URL") != OPENAI_DIRECT_BASE_URL:
+        raise RunGuardError("Manifest must pin OPENAI_BASE_URL to direct OpenAI")
+    if not isinstance(openai_key, str) or len(openai_key) < 20:
+        raise RunGuardError("Direct OpenAI credential has an invalid shape")
     ambient = os.environ if ambient_environment is None else ambient_environment
     safe_ambient_names = {
         "HOME",
@@ -368,7 +456,7 @@ def build_paid_environment(
     environment.update(
         {
             "OPENROUTER_API_KEY": key,
-            "OPENAI_API_KEY": key,
+            "OPENAI_API_KEY": openai_key,
             **{
                 name: value
                 for name, value in manifest_environment.items()
@@ -542,22 +630,6 @@ def endpoint_inventory_mismatches(inventory: Any) -> dict[str, Any]:
                     "expected": 1,
                     "actual": eligible_count,
                 }
-        elif requested_model == GPT52_ALIAS_MODEL:
-            if active_count != GPT52_ALIAS_ACTIVE_ENDPOINT_COUNT:
-                mismatches[f"{requested_model}.active_endpoint_count"] = {
-                    "expected": GPT52_ALIAS_ACTIVE_ENDPOINT_COUNT,
-                    "actual": active_count,
-                }
-            if matching_count != GPT52_ALIAS_MATCHING_ENDPOINT_COUNT:
-                mismatches[f"{requested_model}.matching_active_endpoint_count"] = {
-                    "expected": GPT52_ALIAS_MATCHING_ENDPOINT_COUNT,
-                    "actual": matching_count,
-                }
-            if eligible_count != GPT52_ALIAS_ELIGIBLE_ACTIVE_ENDPOINT_COUNT:
-                mismatches[f"{requested_model}.eligible_active_endpoint_count"] = {
-                    "expected": GPT52_ALIAS_ELIGIBLE_ACTIVE_ENDPOINT_COUNT,
-                    "actual": eligible_count,
-                }
         else:
             if not _is_int(active_count) or active_count < 1:
                 mismatches[f"{requested_model}.active_endpoint_count"] = {
@@ -607,43 +679,6 @@ def validate_endpoint_inventory(inventory: Any) -> None:
     mismatches = endpoint_inventory_mismatches(inventory)
     if mismatches:
         raise RunGuardError(f"OpenRouter endpoint inventory is invalid: {mismatches}")
-
-
-def gpt52_alias_inventory_mismatches(inventory: Any) -> dict[str, Any]:
-    """Require the exact catalog evidence that binds the GPT-5.2 moving alias."""
-    mismatches = {
-        f"inventory.{field}": detail
-        for field, detail in endpoint_inventory_mismatches(inventory).items()
-    }
-    entries = inventory.get("entries") if isinstance(inventory, dict) else None
-    matching_entries = [
-        entry
-        for entry in (entries if isinstance(entries, list) else [])
-        if isinstance(entry, dict) and entry.get("requested_model") == GPT52_ALIAS_MODEL
-    ]
-    if len(matching_entries) != 1:
-        mismatches["gpt52_alias.entry_count"] = {
-            "expected": 1,
-            "actual": len(matching_entries),
-        }
-        return mismatches
-    entry = matching_entries[0]
-    expected = {
-        "response_model_id": GPT52_ALIAS_MODEL,
-        "provider": "OpenAI",
-        "resolved_model": GPT52_RESOLVED_MODEL,
-        "status": 0,
-        "active_endpoint_count": GPT52_ALIAS_ACTIVE_ENDPOINT_COUNT,
-        "eligible_active_endpoint_count": (GPT52_ALIAS_ELIGIBLE_ACTIVE_ENDPOINT_COUNT),
-        "matching_active_endpoint_count": GPT52_ALIAS_MATCHING_ENDPOINT_COUNT,
-    }
-    for field, expected_value in expected.items():
-        if entry.get(field) != expected_value:
-            mismatches[f"gpt52_alias.{field}"] = {
-                "expected": expected_value,
-                "actual": entry.get(field),
-            }
-    return mismatches
 
 
 def fetch_openrouter_endpoint_inventory(
@@ -1539,7 +1574,13 @@ def _candidate_raw_route_projection(
             response_id_keys.setdefault(response_id, []).append(response_key)
             response_id_counts_by_simulation[key][role] += 1
             usage = raw_data.get("usage")
-            raw_cost = usage.get("cost") if isinstance(usage, dict) else None
+            if role == "assistant":
+                # OpenRouter serializes its own authoritative usage.cost.
+                raw_cost = usage.get("cost") if isinstance(usage, dict) else None
+            else:
+                # Direct OpenAI returns no usage.cost; bind the serialized
+                # litellm-computed message cost exactly like the official run.
+                raw_cost = message.get("cost")
             if _is_finite_number(raw_cost) and float(raw_cost) >= 0.0:
                 usage_costs[role].append(float(raw_cost))
             else:
@@ -1631,7 +1672,6 @@ def full_gate_raw_route_mismatches(
             }
         }
     role_totals = {"assistant": 0, "user": 0}
-    alias_observed = False
     invalid_rows = []
     for row in counters:
         if not isinstance(row, dict):
@@ -1655,23 +1695,10 @@ def full_gate_raw_route_mismatches(
                 and service_tier is None
             )
         else:
-            alias_route = normalized == GPT52_ALIAS_MODEL
-            alias_observed = alias_observed or alias_route
-            resolved = (
-                normalized.removeprefix("openai/")
-                if isinstance(normalized, str)
-                else normalized
-            )
             valid = (
-                provider == "OpenAI"
+                normalized == DIRECT_OPENAI_USER_MODEL
+                and provider is None
                 and service_tier == "default"
-                and (
-                    resolved in {"gpt-5.2-2025-12-11", "gpt-5.2-20251211"}
-                    or (
-                        alias_route
-                        and not gpt52_alias_inventory_mismatches(endpoint_inventory)
-                    )
-                )
             )
         if not valid:
             invalid_rows.append(row)
@@ -1679,28 +1706,16 @@ def full_gate_raw_route_mismatches(
         role_totals[role] += count
     if invalid_rows:
         mismatches["raw_route_counters"] = {
-            "expected": "only pinned Qwen and proven OpenAI GPT-5.2 routes",
+            "expected": (
+                "only pinned OpenRouter/Alibaba Qwen and direct-OpenAI dated "
+                "GPT-5.2 routes"
+            ),
             "actual": invalid_rows,
         }
     if any(count == 0 for count in role_totals.values()):
         mismatches["raw_route_coverage"] = {
             "expected": "at least one attributed assistant and user response",
             "actual": role_totals,
-        }
-    expected_alias_proven = (
-        not gpt52_alias_inventory_mismatches(endpoint_inventory)
-        if alias_observed
-        else None
-    )
-    if gate.get("raw_route_gpt52_alias_observed") is not alias_observed:
-        mismatches["raw_route_gpt52_alias_observed"] = {
-            "expected": alias_observed,
-            "actual": gate.get("raw_route_gpt52_alias_observed"),
-        }
-    if gate.get("raw_route_gpt52_alias_inventory_proven") is not expected_alias_proven:
-        mismatches["raw_route_gpt52_alias_inventory_proven"] = {
-            "expected": expected_alias_proven,
-            "actual": gate.get("raw_route_gpt52_alias_inventory_proven"),
         }
     unattributed = gate.get("raw_route_unattributed_generated_messages")
     if unattributed != {}:
@@ -3257,6 +3272,7 @@ def execute_paid_plan(
 ) -> int:
     """Execute one paid plan while one inherited output-directory lease is held."""
     key = load_openrouter_key(args.credential_config, os.environ)
+    openai_key = load_openai_key(args.credential_config, os.environ)
     required_credit_usd = config["modes"][args.mode]["historical_chat_cost_usd"]
     if (
         not _is_finite_number(required_credit_usd)
@@ -3267,7 +3283,10 @@ def execute_paid_plan(
     plan["openrouter_credit_state"] = fetch_openrouter_credit_state(
         key, float(required_credit_usd)
     )
-    environment = build_paid_environment(key, manifest_environment)
+    plan["openai_model_preflight"] = verify_openai_key_models(openai_key)
+    environment = build_paid_environment(
+        key, manifest_environment, openai_key=openai_key
+    )
     with hold_output_run_lock(output_dir) as lock_handle:
         inherited_lock = (lock_handle.fileno(),)
         planned_state = plan.get("execution_state")
