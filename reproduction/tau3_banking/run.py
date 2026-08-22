@@ -834,6 +834,29 @@ def evaluation_only_commit_delta(
     }
 
 
+def _state_matches_current_or_evaluation_delta(
+    recorded_state: Any, current_state: dict[str, Any]
+) -> bool:
+    """Exact state-digest equality, or the same clean state whose runtime head
+    trails the current HEAD only by evaluation-only commits with an unchanged
+    embedding cache."""
+    if not isinstance(recorded_state, dict):
+        return False
+    if recorded_state.get("digest") == current_state["digest"]:
+        return True
+    runtime = recorded_state.get("runtime") or {}
+    try:
+        evaluation_only_commit_delta(
+            runtime.get("head"), current_state["runtime"]["head"]
+        )
+    except RunGuardError:
+        return False
+    return bool(runtime.get("worktree_clean")) and (
+        (recorded_state.get("embedding_cache") or {}).get("digest")
+        == (current_state.get("embedding_cache") or {}).get("digest")
+    )
+
+
 def verify_checkout(config: dict[str, Any]) -> dict[str, Any]:
     """Verify the immutable upstream base and banking data objects."""
     expected_commit = config["benchmark"]["git_commit"]
@@ -2311,30 +2334,13 @@ def verify_full_gate(
             "Bound execution manifest is not canonical: "
             + ", ".join(failed_manifest_requirements)
         )
-    post_run_state = manifest.get("post_run_execution_state") or {}
-    if post_run_state.get("digest") != current_state["digest"]:
-        # The manifest state was captured at the candidate's run commit. It is
-        # acceptable only when HEAD trails it by evaluation-only commits, the
-        # worktree was and is clean, and the bound embedding cache is unchanged.
-        checkpoint_commit = (candidate_checkpoint.get("info") or {}).get("git_commit")
-        evaluation_only_commit_delta(
-            checkpoint_commit, current_state["runtime"]["head"]
+    if not _state_matches_current_or_evaluation_delta(
+        manifest.get("post_run_execution_state"), current_state
+    ):
+        raise RunGuardError(
+            "Bound execution manifest cache/runtime state differs from the "
+            "current state beyond an evaluation-only commit delta"
         )
-        post_runtime = post_run_state.get("runtime") or {}
-        if post_runtime.get("head") != checkpoint_commit or not post_runtime.get(
-            "worktree_clean"
-        ):
-            raise RunGuardError(
-                "Bound execution manifest post-run runtime does not match the "
-                "candidate checkpoint commit"
-            )
-        if (post_run_state.get("embedding_cache") or {}).get("digest") != (
-            current_state.get("embedding_cache") or {}
-        ).get("digest"):
-            raise RunGuardError(
-                "Bound execution manifest embedding-cache state differs from "
-                "the current cache"
-            )
     return current_state
 
 
@@ -2630,8 +2636,9 @@ def _validate_resume_manifest(
             finalized_checkpoint_provenance = (
                 status in {"completed", "failed", "interrupted", "runner_exception"}
                 and manifest.get("checkpoint_sha256") == expected_checkpoint_digest
-                and (manifest.get("post_run_execution_state") or {}).get("digest")
-                == current_state["digest"]
+                and _state_matches_current_or_evaluation_delta(
+                    manifest.get("post_run_execution_state"), current_state
+                )
             )
             retryable_infrastructure_provenance = False
             if (
@@ -2687,8 +2694,9 @@ def _validate_resume_manifest(
                     is True
                     and manifest.get("exit_code") == 2
                     and manifest.get("checkpoint_sha256") == expected_checkpoint_digest
-                    and (manifest.get("post_run_execution_state") or {}).get("digest")
-                    == current_state["digest"]
+                    and _state_matches_current_or_evaluation_delta(
+                        manifest.get("post_run_execution_state"), current_state
+                    )
                     and manifest.get("finalization_errors") is None
                 )
             finalization_errors = manifest.get("finalization_errors")
@@ -2706,7 +2714,12 @@ def _validate_resume_manifest(
                 )
                 and manifest.get("checkpoint_sha256")
                 in {None, expected_checkpoint_digest}
-                and stored_post_digest in {None, current_state["digest"]}
+                and (
+                    stored_post_digest is None
+                    or _state_matches_current_or_evaluation_delta(
+                        manifest.get("post_run_execution_state"), current_state
+                    )
+                )
                 and (
                     (
                         status == "finalization_failed"
@@ -2722,10 +2735,9 @@ def _validate_resume_manifest(
                 "output_dir": manifest.get("output_dir") == str(output_dir),
                 "reference_config": manifest.get("reference_config_sha256")
                 == expected_config_digest,
-                "runtime_cache_state": (manifest.get("execution_state") or {}).get(
-                    "digest"
-                )
-                == current_state["digest"],
+                "runtime_cache_state": _state_matches_current_or_evaluation_delta(
+                    manifest.get("execution_state"), current_state
+                ),
                 "checkpoint_provenance": running_checkpoint_provenance
                 or finalized_checkpoint_provenance
                 or retryable_infrastructure_provenance

@@ -3744,3 +3744,49 @@ def test_evaluation_only_commit_delta_accepts_only_evaluation_paths(monkeypatch)
             reproduction_run.RunGuardError, match="Runtime-affecting paths"
         ):
             reproduction_run.evaluation_only_commit_delta(candidate, head)
+
+
+def test_state_matches_current_or_evaluation_delta(monkeypatch):
+    current = {
+        "digest": "current-digest",
+        "runtime": {"head": "b" * 40},
+        "embedding_cache": {"digest": "cache-digest"},
+    }
+    assert reproduction_run._state_matches_current_or_evaluation_delta(
+        {"digest": "current-digest"}, current
+    )
+    assert not reproduction_run._state_matches_current_or_evaluation_delta(
+        None, current
+    )
+
+    monkeypatch.setattr(reproduction_run, "git_is_ancestor", lambda a, b: True)
+    monkeypatch.setattr(
+        reproduction_run,
+        "git_output",
+        lambda *args: "reproduction/tau3_banking/compare_results.py",
+    )
+    recorded = {
+        "digest": "older-digest",
+        "runtime": {"head": "a" * 40, "worktree_clean": True},
+        "embedding_cache": {"digest": "cache-digest"},
+    }
+    assert reproduction_run._state_matches_current_or_evaluation_delta(
+        recorded, current
+    )
+
+    dirty = copy.deepcopy(recorded)
+    dirty["runtime"]["worktree_clean"] = False
+    assert not reproduction_run._state_matches_current_or_evaluation_delta(
+        dirty, current
+    )
+
+    cache_changed = copy.deepcopy(recorded)
+    cache_changed["embedding_cache"]["digest"] = "other-cache"
+    assert not reproduction_run._state_matches_current_or_evaluation_delta(
+        cache_changed, current
+    )
+
+    monkeypatch.setattr(reproduction_run, "git_output", lambda *args: "src/tau2/run.py")
+    assert not reproduction_run._state_matches_current_or_evaluation_delta(
+        recorded, current
+    )
