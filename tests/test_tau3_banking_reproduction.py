@@ -1560,9 +1560,29 @@ def test_full_gate_never_classifies_backend_output_as_sampling_drift():
         "component_mismatch_count": 0,
     }
 
+    # Same-call tool_output sampling attribution is admissible now that the
+    # comparator counts it only under a byte-exact endogenous replay proof,
+    # which full-gate verification independently recomputes from the bound
+    # checkpoint.
     mismatches = reproduction_run.full_gate_behavior_mismatches(receipt)
+    assert "model_sampling_drift_type_scope" not in mismatches
 
+    dense_as_sampling = copy.deepcopy(receipt)
+    dense_as_sampling["behavior_mismatch_counts"] = {"tool_output_dense_known_drift": 1}
+    dense_as_sampling["mismatch_counts"] = {"tool_output_dense_known_drift": 1}
+    dense_as_sampling["model_sampling_drift_mismatch_counts"] = {
+        "tool_output_dense_known_drift": 1
+    }
+    mismatches = reproduction_run.full_gate_behavior_mismatches(dense_as_sampling)
     assert "model_sampling_drift_type_scope" in mismatches
+
+    error_as_sampling = copy.deepcopy(receipt)
+    error_as_sampling["behavior_mismatch_counts"] = {"tool_output_error": 1}
+    error_as_sampling["mismatch_counts"] = {"tool_output_error": 1}
+    error_as_sampling["model_sampling_drift_mismatch_counts"] = {"tool_output_error": 1}
+    mismatches = reproduction_run.full_gate_behavior_mismatches(error_as_sampling)
+    assert "model_sampling_drift_type_scope" in mismatches
+
     receipt["text_divergence_message_counts"] = {"system": 0}
     mismatches = reproduction_run.full_gate_behavior_mismatches(receipt)
     assert "text_divergence_message_counts" in mismatches

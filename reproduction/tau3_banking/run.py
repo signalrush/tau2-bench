@@ -72,16 +72,24 @@ KNOWN_DENSE_DRIFT_WAIVER_SCOPE = (
 )
 MODEL_SAMPLING_DRIFT_WAIVER_SCOPE = (
     "generated assistant/user text and model-selected tool-call count, sequence, "
-    "arguments, their downstream paired outputs, and resulting per-task reward/"
-    "component differences only when every differing deterministic component is "
-    "exactly reproduced by the official offline evaluator and every NL change has "
-    "the validated dated judge route; exact task/trial coverage, seeds, user_stop, "
-    "internally valid grading, and aggregate reward remain mandatory"
+    "arguments, their downstream paired outputs, stateful non-retrieval tool "
+    "outputs whose divergence the official offline environment replay of the "
+    "owning trajectory's own call history reproduces byte-exactly, and resulting "
+    "per-task reward/component differences only when every differing "
+    "deterministic component is exactly reproduced by the official offline "
+    "evaluator and every NL change has the validated dated judge route; exact "
+    "task/trial coverage, seeds, user_stop, internally valid grading, and "
+    "aggregate reward remain mandatory"
 )
 MODEL_SAMPLING_MISMATCH_KINDS = {
     "tool_call_count",
     "tool_call_sequence",
     "tool_call_arguments",
+    # Same-call stateful output divergence is sampling-attributable only when
+    # the official offline environment replay of the owning trajectory's own
+    # call history reproduces the observed output byte-exactly; the comparator
+    # enforces that proof before counting the kind here.
+    "tool_output",
     "tool_output_missing",
     "tool_output_unexpected",
 }
