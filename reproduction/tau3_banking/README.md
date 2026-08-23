@@ -25,6 +25,19 @@ facts; it contains no credential or account identifier. No further Qwen run is
 authorized until direct-OpenAI billing, a fresh cache fingerprint, and dense
 retrieval parity are verified.
 
+Recheck that external gate with one tiny embedding input (not the 698-document
+cache build). The command is a dry run unless `--execute` is present, never
+prints the key or embedding, and writes only a redacted receipt:
+
+```bash
+uv run --frozen python reproduction/tau3_banking/check_direct_openai.py \
+  --execute --probe-billing \
+  --output reproduction/tau3_banking/reports/direct_openai_readiness.json
+```
+
+Exit 0 means all three model metadata checks and the billing probe passed;
+exit 3 means the redacted provider response still blocks paid evaluation.
+
 ## Reference target
 
 - Upstream: `sierra-research/tau2-bench` at

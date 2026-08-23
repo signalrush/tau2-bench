@@ -1,23 +1,25 @@
 {
-  "schema_version": 1,
-  "checked_at": "2026-08-23T02:45:37Z",
+  "billing_probe": {
+    "attempted": true,
+    "embedding_values_recorded": false,
+    "error_code": "billing_not_active",
+    "error_type": "billing_not_active",
+    "http_status": 429,
+    "input_count": 1,
+    "model": "text-embedding-3-large",
+    "status": "blocked"
+  },
+  "checked_at": "2026-08-23T02:55:32Z",
   "credential_locator": "env:OPENAI_API_KEY",
   "credential_present": true,
   "credential_value_recorded": false,
+  "model_errors": {},
   "model_metadata": {
-    "gpt-5.2": "accessible",
     "gpt-4.1-2025-04-14": "accessible",
+    "gpt-5.2": "accessible",
     "text-embedding-3-large": "accessible"
   },
-  "embedding_probe": {
-    "model": "text-embedding-3-large",
-    "document_count": 698,
-    "status": "rejected_before_computation",
-    "http_status": 429,
-    "error_type": "billing_not_active",
-    "embeddings_returned": 0,
-    "cache_written": false
-  },
+  "next_gate": "Resolve the redacted readiness error before any Qwen smoke or full run.",
   "paid_evaluation_ready": false,
-  "next_gate": "Activate billing for the credential, rebuild and fingerprint the direct-OpenAI document cache, then validate official dense-query rankings before any Qwen smoke or full run."
+  "schema_version": 1
 }

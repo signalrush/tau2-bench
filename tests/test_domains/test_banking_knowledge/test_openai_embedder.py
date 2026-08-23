@@ -7,6 +7,7 @@ import numpy as np
 
 from tau2.knowledge.document_preprocessors.embedding_indexer import EmbeddingIndexer
 from tau2.knowledge.embedders.openai_embedder import (
+    DIRECT_OPENAI_EMBEDDING_TRANSPORT,
     OPENROUTER_EMBEDDING_TRANSPORT,
     OpenAIEmbedder,
 )
@@ -79,6 +80,20 @@ def test_openrouter_transport_uses_distinct_document_cache(monkeypatch):
     }
 
 
+def test_direct_openai_transport_uses_distinct_document_cache(monkeypatch):
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+
+    indexer = EmbeddingIndexer(
+        embedder_type="openai",
+        embedder_params={"model": "text-embedding-3-large"},
+    )
+
+    assert indexer._get_cache_config() == {
+        "model": "text-embedding-3-large",
+        "_transport": DIRECT_OPENAI_EMBEDDING_TRANSPORT,
+    }
+
+
 def test_openrouter_transport_uses_distinct_query_cache(monkeypatch):
     monkeypatch.setenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-test-key")
@@ -91,4 +106,19 @@ def test_openrouter_transport_uses_distinct_query_cache(monkeypatch):
     assert encoder._get_cache_config() == {
         "model": "text-embedding-3-large",
         "_transport": OPENROUTER_EMBEDDING_TRANSPORT,
+    }
+
+
+def test_direct_openai_transport_uses_distinct_query_cache(monkeypatch):
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-test-key")
+
+    encoder = EmbeddingEncoder(
+        embedder_type="openai",
+        embedder_params={"model": "text-embedding-3-large"},
+    )
+
+    assert encoder._get_cache_config() == {
+        "model": "text-embedding-3-large",
+        "_transport": DIRECT_OPENAI_EMBEDDING_TRANSPORT,
     }

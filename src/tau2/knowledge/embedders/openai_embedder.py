@@ -9,6 +9,7 @@ from openai import OpenAI
 from tau2.knowledge.embedders.base import BaseEmbedder
 
 OPENROUTER_EMBEDDING_TRANSPORT = "openrouter-openai-provider-v1"
+DIRECT_OPENAI_EMBEDDING_TRANSPORT = "direct-openai-provider-v1"
 
 
 def get_openai_cache_config(params: dict) -> dict:
@@ -17,6 +18,11 @@ def get_openai_cache_config(params: dict) -> dict:
     base_url = os.getenv("OPENAI_BASE_URL")
     if base_url and "openrouter.ai" in base_url.lower():
         config["_transport"] = OPENROUTER_EMBEDDING_TRANSPORT
+    elif not base_url or "api.openai.com" in base_url.lower():
+        # Old upstream caches did not bind the transport at all. Keep a fresh
+        # direct-OpenAI rebuild separate from those unversioned artifacts so a
+        # parity run cannot silently reuse vectors of unknown provenance.
+        config["_transport"] = DIRECT_OPENAI_EMBEDDING_TRANSPORT
     return config
 
 
