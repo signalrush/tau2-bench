@@ -1346,3 +1346,57 @@ sandbox.
     `635b9a31cf9088fabc4294c40a3ce2886aeba66fc88682a1e3032aa8bf595b1f`
   - judge response IDs:
     `26411e877388b8cbb76007f210c2b7ef4207467be73f92b067835dbde4688fff`
+
+## 2026-08-23 - Nemotron Super full checkpoint resume blocked by DeepInfra
+
+- After the GLM-5.2 run completed, resumed the existing Nemotron Super
+  checkpoint from its exact clean runtime commit
+  `aa6eaa5cffadb6f7f470b2235caa543d998e6e01`. The authenticated free credit
+  preflight at `2026-08-23T08:11:07.363812+00:00` recorded `$4,100.00` total
+  credit, `$3,165.241331872` usage, and `$934.758668128` remaining against the
+  Nemotron full mode's `$40` gate. No credential was printed or copied.
+- Exact guarded resume command:
+
+  ```bash
+  uv run --frozen --extra knowledge python \
+    reproduction/tau3_banking/run_nemotron_super.py full \
+    --output-dir reproduction/tau3_banking/runs/nemotron_full_aa6eaa5 \
+    --smoke-manifest \
+    reproduction/tau3_banking/runs/nemotron_smoke_aa6eaa5/nemotron_super_manifest.json \
+    --resume --execute --confirm-paid-api-calls
+  ```
+
+  The launch ran from `2026-08-23T08:11:08.261218+00:00` through
+  `2026-08-23T08:20:53.644892+00:00` at concurrency 10. Its checkpoint chain
+  was
+  `e6d10a16e182f9fdc9d4f50b8319f8d25a9eb4612258be196fb6a283dc9b23fa`
+  to
+  `ffa48719b0a90ac93dd62086a49088cdb285ac495cab5ce0781dfd95c11f53c7`.
+- Routing remained strict: Nemotron through DeepInfra only with fallback
+  disabled; GPT-5.2 user simulation through OpenAI only; the dated GPT-4.1
+  judge for `task_102`; and Modal sandboxing. DeepInfra's shared upstream pool
+  returned persistent HTTP 429 `engine_overloaded` responses. The underlying
+  tau2 runner completed its sweep, but the parity wrapper correctly exited 2
+  with `post_run_validation_failed` because infrastructure errors remained.
+- The checkpoint now has all 194 task/trial keys, but only **12 validated model
+  outcomes**: 11 `user_stop` and one valid `too_many_errors`. The remaining
+  **182 are `infrastructure_error` placeholders** and are not scored outcomes.
+  This launch admitted one new valid trajectory (`task_006`, trial 0, reward
+  1); every other unfinished key remains eligible only for authenticated
+  `--resume`. No scored output was replayed, copied, or cherry-picked.
+- The incomplete validated slice is 3/12 and must not be reported as the full
+  benchmark score. Retained serialized checkpoint costs are `$1.11844116` for
+  Nemotron and `$0.145257` for the user simulator; rejected 429 attempts and
+  Modal/embedding charges are not represented by these result fields.
+- Final receipts for this failed infrastructure sweep:
+
+  - `results.json`:
+    `ffa48719b0a90ac93dd62086a49088cdb285ac495cab5ce0781dfd95c11f53c7`
+  - `nemotron_super_manifest.json`:
+    `7ea062baa0bfdee8f90dec00d80a480e9e16c7f2d64d8a21426ec9347fc66f84`
+
+  The manifest also retains an earlier `finalization_error` receipt for a
+  transient dirty-runtime guard involving `reference.json` and `run.py`; the
+  actual resume above began from clean commit `aa6eaa5`, and the evaluation
+  host was restored afterward to clean published branch
+  `agent/tau3-banking-modal-parity` at `a3c10af`.
