@@ -120,6 +120,39 @@ def test_participant_routes_require_deepinfra_and_openai():
     }
 
 
+def test_participant_routes_accept_token_limit_finish_reason():
+    assistant = _raw_message("assistant", "agent-1", provider="DeepInfra")
+    assistant["raw_data"]["choices"][0]["finish_reason"] = "length"
+    simulation = {
+        "task_id": "task_001",
+        "trial": 0,
+        "messages": [
+            assistant,
+            _raw_message("user", "user-1", provider="OpenAI"),
+        ],
+    }
+
+    report = nemotron_run.validate_participant_routes([simulation])
+
+    assert report["response_id_count"] == 2
+
+
+def test_participant_routes_reject_unbound_finish_reason():
+    assistant = _raw_message("assistant", "agent-1", provider="DeepInfra")
+    assistant["raw_data"]["choices"][0]["finish_reason"] = "content_filter"
+    simulation = {
+        "task_id": "task_001",
+        "trial": 0,
+        "messages": [
+            assistant,
+            _raw_message("user", "user-1", provider="OpenAI"),
+        ],
+    }
+
+    with pytest.raises(nemotron_run.NemotronRunError, match="route validation"):
+        nemotron_run.validate_participant_routes([simulation])
+
+
 def test_participant_routes_reject_agent_fallback_provider():
     simulation = {
         "task_id": "task_001",

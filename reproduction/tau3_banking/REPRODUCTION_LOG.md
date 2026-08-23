@@ -1509,3 +1509,36 @@ sandbox.
   `finalization_error` receipt involving `reference.json` and `run.py`; its
   post-run execution fingerprint independently records the current runtime as
   clean at exact commit `aa6eaa5`.
+
+### Resume guard correction after the fifth launch
+
+- The next invocation of the same authenticated resume command failed closed
+  before starting tau2 or making any model, embedding, or Modal call. It did
+  only the free credit check, then rejected five assistant responses from the
+  newly completed `task_074` trial 1 as `raw_choice_finish_reason`. No launch
+  receipt was appended and the checkpoint remained byte-identical.
+- Inspection without message content showed that message indexes 68, 70, 72,
+  82, and 84 each had provider `finish_reason = "length"`, exactly 16,000
+  completion tokens, no serialized or raw tool calls, matching serialized/raw
+  content, and otherwise valid DeepInfra model, provider, response-ID, and
+  cost bindings. These are honest max-output-token model outcomes. The generic
+  response-binding guard had incorrectly required `stop` for every text-only
+  response, even though the harness explicitly preserves `length` responses.
+- Corrected only the evaluation-side binding validator to accept `length` for
+  an otherwise structurally bound response. The normal expected value remains
+  `stop` or `tool_calls` according to the serialized message shape, and every
+  other mismatched finish reason still fails closed. This changes neither
+  `src/tau2` nor any candidate, user, grading, retrieval, sandbox, or sampling
+  behavior and is covered by positive `length` and negative `content_filter`
+  regression tests.
+- Offline verification command and result:
+
+  ```bash
+  uv run --frozen pytest -q \
+    tests/test_tau3_banking_reproduction.py \
+    tests/test_tau3_banking_nemotron_super.py
+  ```
+
+  Result: **107 passed**. The existing evaluation-only commit-delta guard will
+  bind this validator correction to the unchanged `aa6eaa5` checkpoint and
+  smoke receipt; no scored output is copied, replayed, or modified.
