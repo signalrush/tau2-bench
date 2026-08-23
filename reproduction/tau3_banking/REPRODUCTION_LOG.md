@@ -1465,3 +1465,47 @@ sandbox.
   NVIDIA NeMo Gym documents the same 97x5 AA-shaped setup but removes the
   task-102 NL assertion, so its no-judge output is also not scoring-identical:
   <https://github.com/NVIDIA-NeMo/Gym/blob/main/benchmarks/tau2/README.md>.
+
+## 2026-08-23 - Nemotron Super third authenticated full resume
+
+- Reused the exact guarded resume command documented above from clean detached
+  runtime `aa6eaa5cffadb6f7f470b2235caa543d998e6e01`. The fifth launch ran from
+  `2026-08-23T09:24:49.455423+00:00` through
+  `2026-08-23T11:10:08.796970+00:00` at concurrency 10. Its numeric-only
+  preflight recorded `$925.2447278979998` remaining against the `$40` full-mode
+  gate. The checkpoint chain is
+  `5c1598df0f1e7f9a1e6c3906063cfb6701a8fa87892f032467f51bbc52e787c9`
+  to
+  `12f981c4d70bd1e56560c7d0c1bed2fb95cb8222d3fb466a685478f21c512c7e`.
+- Upstream auto-resume preserved all 29 prior validated outcomes and retried
+  only infrastructure placeholders. It recovered **29 additional valid
+  `user_stop` trajectories**, three of which passed. The final active key,
+  `task_074` trial 1, completed normally on task-level retry 1 after
+  3,599.18 seconds; it is retained as an honest zero-reward `user_stop`, not an
+  infrastructure placeholder.
+- The checkpoint now contains **58 validated outcomes**: 57 `user_stop` plus
+  one honest `too_many_errors`, with **12 passes**. The remaining **136
+  `infrastructure_error` placeholders** consist of 132 DeepInfra
+  `RateLimitError` / `engine_overloaded` HTTP-429 records and four transient
+  TLS `SSLV3_ALERT_BAD_RECORD_MAC` `APIError` records, each exhausted after
+  four task-level attempts. The incomplete 12/58 slice is not a benchmark
+  score. The tau2 runner exited zero; the wrapper correctly exited 2 with
+  `post_run_validation_failed` because these placeholders remain.
+- Retained serialized checkpoint costs are `$5.171305035` for Nemotron and
+  `$1.0833717999999999` for GPT-5.2 user simulation, or **`$6.254676835`
+  total**. This sweep added `$1.92642777` and `$0.704599` respectively. These
+  fields exclude rejected attempts, embeddings, and Modal. The free post-run
+  account receipt at `2026-08-23T11:11:57.026000+00:00` recorded
+  `$3,185.493396112` usage and `$914.506603888` remaining. Its
+  `$10.73812401` account-wide delta is not an attributed run-cost total.
+- Artifact receipts for this partial recovery sweep:
+
+  - `results.json`:
+    `12f981c4d70bd1e56560c7d0c1bed2fb95cb8222d3fb466a685478f21c512c7e`
+  - `nemotron_super_manifest.json`:
+    `f9515e3ec2df5a19d4ea3a96472e626261c07c7c2ed5c6e6e65823e75709140a`
+
+  The manifest continues to retain the already-documented stale earlier
+  `finalization_error` receipt involving `reference.json` and `run.py`; its
+  post-run execution fingerprint independently records the current runtime as
+  clean at exact commit `aa6eaa5`.
