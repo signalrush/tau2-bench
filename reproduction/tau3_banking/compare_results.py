@@ -1964,7 +1964,11 @@ def participant_raw_response_binding_issues(
     outer_calls = message.get("tool_calls")
     raw_calls = raw_message.get("tool_calls")
     expected_finish_reason = "tool_calls" if outer_calls else "stop"
-    if choice.get("finish_reason") != expected_finish_reason:
+    # A provider may return a fully serialized assistant message while marking
+    # it truncated at the requested output-token limit. The harness preserves
+    # that model outcome, so ``length`` is a valid binding for either message
+    # shape; all other finish-reason mismatches still fail closed.
+    if choice.get("finish_reason") not in {expected_finish_reason, "length"}:
         issue("raw_choice_finish_reason")
     if outer_calls is None:
         if raw_calls is not None:
