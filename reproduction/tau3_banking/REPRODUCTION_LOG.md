@@ -1638,8 +1638,11 @@ sandbox.
 - Retained serialized checkpoint costs are `$8.677295625` for Nemotron and
   `$1.85388455` for GPT-5.2 user simulation, or **`$10.531180175` total**. This
   sweep added `$2.08023599` and `$0.41539855` respectively. These fields
-  exclude rejected attempts, embeddings, and Modal. The free post-run account
-  receipt at `2026-08-23T13:41:21.037148+00:00` recorded
+  are the participant subtotal. Two retained task-102 judge records add
+  `$0.096146`, unchanged in this sweep, so all serialized chat cost is
+  `$10.627326175`. These fields exclude rejected attempts, embeddings, and
+  Modal. The free post-run account receipt at
+  `2026-08-23T13:41:21.037148+00:00` recorded
   `$3,200.725383072` usage and `$899.2746169279999` remaining. Its
   `$7.50355723` account-wide delta is not an attributed run-cost total and can
   include rejected attempts and other account activity.
