@@ -5,6 +5,16 @@ This folder reproduces only the `banking_knowledge` submission
 the exact 97-by-4 reward matrix, and the run arguments. Every run command is a
 dry run unless `--execute` and the paid-call acknowledgement are both present.
 
+## Latest x1 outcome
+
+**NOT EXACT:** the guarded 97-task trial-0 repeat completed 97/97 `user_stop`
+trajectories with zero infrastructure errors but scored **43/97 (44.3299%)**,
+versus the official trial-0 target **54/97 (55.6701%)**. Configuration, route,
+manifest, protocol, and grading-integrity checks passed; the score and traces
+did not. Read the concise [parity report](./reports/qwen38_trial0_parity.pdf),
+its [Markdown source](./reports/qwen38_trial0_parity.md), and the
+[machine-readable metrics receipt](./reports/qwen38_trial0_metrics.json).
+
 ## Reference target
 
 - Upstream: `sierra-research/tau2-bench` at
@@ -14,10 +24,12 @@ dry run unless `--execute` and the paid-call acknowledgement are both present.
   this through direct OpenAI to `gpt-5.2-2025-12-11`).
 - Retrieval: `alltools` (BM25, `text-embedding-3-large`, shell).
 - Seed 300; derived trial seeds 626729, 373753, 361454, 1567; 200 steps;
-  10 consecutive tool errors; 4 trials; 97 tasks.
+  10 consecutive tool errors; 4 trials in the public artifact; 97 tasks.
 - Exact score: 214/388 = `55.154639175257735%` pass@1. Pass@2/3/4 are
   `45.18900343642611%`, `39.69072164948454%`, and
   `35.051546391752574%`.
+- This reproduction's cost-reduced live target is only public trial 0:
+  54/97 = `55.6701030927835%`.
 
 [`reference.json`](./reference.json) is the machine-readable source of truth.
 It also records immutable Git objects, artifact SHA-256 values, costs, mode

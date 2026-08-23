@@ -1,0 +1,12 @@
+{
+  "expected_external_link_count": 16,
+  "page_count": 4,
+  "pages_dir": "reproduction/tau3_banking/reports/qwen38_trial0_parity-pages",
+  "pdf": "reproduction/tau3_banking/reports/qwen38_trial0_parity.pdf",
+  "pdf_sha256": "17d6e27ee7c69a43a772a8946aa4315df0f0d0d8b6671d3410486f8b5a65f2be",
+  "receipt": "reproduction/tau3_banking/reports/qwen38_trial0_parity.receipt.json",
+  "renderer_sha256": "d3caabd66b37787f607ab040fc1f541a6e6f37866bb124ec73a19491b4032957",
+  "source": "reproduction/tau3_banking/reports/qwen38_trial0_parity.md",
+  "source_sha256": "e25f66189f39a3b37508e9d86922891ad7e9e097aa91d02c8aeebc56b4f70382",
+  "verified_external_link_count": 16
+}

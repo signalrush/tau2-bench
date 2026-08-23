@@ -1,5 +1,6 @@
 artifacts/*
 !artifacts/shell_oracle_full_active_manifest.json
 runs/
+reports/*-pages/
 .state/
 __pycache__/

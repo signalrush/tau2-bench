@@ -1,0 +1,308 @@
+{
+  "candidate_artifact": {
+    "path": "reproduction/tau3_banking/runs/qwen38_full_trial0_repeat/results.json",
+    "sha256": "92051d8923946012e609ad1f25cbc6f57754f8a49746e28fc8b9babb3a93e2d3"
+  },
+  "candidate_trial0": {
+    "assistant_tokens": {
+      "completion_tokens": 1651427,
+      "generation_count": 2249,
+      "mean_completion_tokens": 734.293908403735,
+      "mean_prompt_tokens": 54288.21120497999,
+      "mean_reasoning_tokens": 578.6909737661183,
+      "prompt_tokens": 122094187,
+      "reasoning_tokens": 1301476
+    },
+    "distinct_tool_name_count": 18,
+    "generated_messages_by_role": {
+      "assistant": 2249,
+      "user": 652
+    },
+    "generated_participant_message_count": 2901,
+    "generated_participant_messages_per_simulation": 29.90721649484536,
+    "infrastructure_error_count": 0,
+    "judge_call_count": 1,
+    "judge_cost_usd": 0.10739,
+    "mean_duration_seconds": 428.20685194219527,
+    "participant_chat_cost_usd_by_role": {
+      "assistant": 71.965448,
+      "user": 1.73788265
+    },
+    "participant_chat_cost_usd_per_simulation": 0.7598281510309278,
+    "participant_chat_cost_usd_total": 73.70333065,
+    "pass_rate_percent": 44.329896907216494,
+    "reward_sum": 43.0,
+    "serialized_simulation_cost_usd": {
+      "assistant": 71.965448,
+      "user": 1.73788265
+    },
+    "simulation_count": 97,
+    "termination_counts": {
+      "user_stop": 97
+    },
+    "tool_call_count": 3840,
+    "tool_call_counts_by_name": {
+      "KB_search_bm25": 526,
+      "KB_search_dense": 483,
+      "apply_for_credit_card": 21,
+      "call_discoverable_agent_tool": 509,
+      "call_discoverable_user_tool": 94,
+      "get_credit_card_accounts_by_user": 37,
+      "get_credit_card_transactions_by_user": 30,
+      "get_current_time": 99,
+      "get_referrals_by_user": 7,
+      "get_user_information_by_email": 6,
+      "get_user_information_by_name": 75,
+      "give_discoverable_user_tool": 93,
+      "log_verification": 79,
+      "request_human_agent_transfer": 11,
+      "shell": 1456,
+      "submit_referral": 8,
+      "transfer_to_human_agents": 18,
+      "unlock_discoverable_agent_tool": 288
+    },
+    "tool_calls_per_simulation": 39.58762886597938,
+    "user_tokens": {
+      "completion_tokens": 61718,
+      "generation_count": 652,
+      "mean_completion_tokens": 94.65950920245399,
+      "mean_prompt_tokens": 2420.697852760736,
+      "mean_reasoning_tokens": 13.943251533742332,
+      "prompt_tokens": 1578295,
+      "reasoning_tokens": 9091
+    }
+  },
+  "first_turn_evidence": {
+    "byte_equivalent_first_agent_input_task_count": 47,
+    "byte_equivalent_first_agent_input_tasks": [
+      "task_012",
+      "task_014",
+      "task_023",
+      "task_024",
+      "task_026",
+      "task_028",
+      "task_029",
+      "task_031",
+      "task_032",
+      "task_034",
+      "task_036",
+      "task_037",
+      "task_038",
+      "task_043",
+      "task_047",
+      "task_048",
+      "task_049",
+      "task_050",
+      "task_051",
+      "task_052",
+      "task_054",
+      "task_059",
+      "task_060",
+      "task_061",
+      "task_063",
+      "task_066",
+      "task_068",
+      "task_069",
+      "task_072",
+      "task_073",
+      "task_074",
+      "task_077",
+      "task_078",
+      "task_079",
+      "task_080",
+      "task_081",
+      "task_084",
+      "task_085",
+      "task_086",
+      "task_087",
+      "task_088",
+      "task_091",
+      "task_092",
+      "task_095",
+      "task_096",
+      "task_097",
+      "task_101"
+    ],
+    "equal_first_agent_prompt_token_count": 58,
+    "equal_first_user_prompt_token_count": 16,
+    "exact_first_agent_output_on_equivalent_input_count": 0,
+    "exact_first_user_text_count": 47,
+    "first_user_prompt_token_delta_counts": {
+      "-81": 81,
+      "0": 16
+    }
+  },
+  "official_trial0": {
+    "assistant_tokens": {
+      "completion_tokens": 1513186,
+      "generation_count": 2234,
+      "mean_completion_tokens": 677.3437779767233,
+      "mean_prompt_tokens": 53495.32811101164,
+      "mean_reasoning_tokens": 512.531781557744,
+      "prompt_tokens": 119508563,
+      "reasoning_tokens": 1144996
+    },
+    "distinct_tool_name_count": 20,
+    "generated_messages_by_role": {
+      "assistant": 2234,
+      "user": 675
+    },
+    "generated_participant_message_count": 2909,
+    "generated_participant_messages_per_simulation": 29.989690721649485,
+    "infrastructure_error_count": 0,
+    "judge_call_count": 0,
+    "judge_cost_usd": 0.0,
+    "mean_duration_seconds": 393.5312631304673,
+    "participant_chat_cost_usd_by_role": {
+      "assistant": 60.420754,
+      "user": 1.8297993
+    },
+    "participant_chat_cost_usd_per_simulation": 0.6417582814432989,
+    "participant_chat_cost_usd_total": 62.2505533,
+    "pass_rate_percent": 55.670103092783506,
+    "reward_sum": 54.0,
+    "serialized_simulation_cost_usd": {
+      "assistant": 0.0,
+      "user": 1.8297993
+    },
+    "simulation_count": 97,
+    "termination_counts": {
+      "user_stop": 97
+    },
+    "tool_call_count": 3604,
+    "tool_call_counts_by_name": {
+      "KB_search_bm25": 457,
+      "KB_search_dense": 444,
+      "apply_for_credit_card": 21,
+      "call_discoverable_agent_tool": 565,
+      "call_discoverable_user_tool": 67,
+      "change_user_email": 1,
+      "get_credit_card_accounts_by_user": 41,
+      "get_credit_card_transactions_by_user": 27,
+      "get_current_time": 95,
+      "get_referrals_by_user": 7,
+      "get_user_information_by_email": 4,
+      "get_user_information_by_name": 76,
+      "give_discoverable_user_tool": 77,
+      "log_verification": 79,
+      "request_human_agent_transfer": 12,
+      "shell": 1282,
+      "submit_referral": 6,
+      "submit_transaction": 1,
+      "transfer_to_human_agents": 20,
+      "unlock_discoverable_agent_tool": 322
+    },
+    "tool_calls_per_simulation": 37.154639175257735,
+    "user_tokens": {
+      "completion_tokens": 60432,
+      "generation_count": 675,
+      "mean_completion_tokens": 89.52888888888889,
+      "mean_prompt_tokens": 2490.32,
+      "mean_reasoning_tokens": 11.248888888888889,
+      "prompt_tokens": 1680966,
+      "reasoning_tokens": 7593
+    }
+  },
+  "parity_artifact": {
+    "path": "reproduction/tau3_banking/runs/qwen38_full_trial0_repeat/parity.json",
+    "sha256": "fce8b34d20aff5745315910623185d453aae68837bd9f7c0e16a6c50e8d9accb"
+  },
+  "reference_artifact": {
+    "path": "reproduction/tau3_banking/artifacts/banking_knowledge_results.json",
+    "sha256": "8c8191c43dfb2d21c1322cc154740e5e6044151837ab817c2cbbcd13ffeb626e"
+  },
+  "reward_flips": {
+    "count": 23,
+    "official_fail_candidate_pass": [
+      "task_007",
+      "task_008",
+      "task_014",
+      "task_057",
+      "task_090",
+      "task_099"
+    ],
+    "official_pass_candidate_fail": [
+      "task_005",
+      "task_016",
+      "task_033",
+      "task_040",
+      "task_045",
+      "task_048",
+      "task_049",
+      "task_051",
+      "task_054",
+      "task_059",
+      "task_070",
+      "task_071",
+      "task_072",
+      "task_078",
+      "task_094",
+      "task_096",
+      "task_101"
+    ]
+  },
+  "schema_version": 1,
+  "strict_comparator": {
+    "aggregate_score_parity": false,
+    "behavior_mismatch_count": 6424,
+    "behavior_mismatch_counts": {
+      "tool_call_arguments": 1000,
+      "tool_call_count": 90,
+      "tool_call_sequence": 96,
+      "tool_output": 6,
+      "tool_output_missing": 2498,
+      "tool_output_unexpected": 2734
+    },
+    "candidate_grading_integrity_issue_count": 0,
+    "component_mismatch_count": 69,
+    "configuration_mismatch_count": 0,
+    "execution_manifest_mismatch_count": 0,
+    "judge_route_mismatch_count": 0,
+    "judge_route_observations": [
+      {
+        "provider": "OpenAI",
+        "raw_response_sha256": "05641138faedc3cb9b0e8584ff802b93b7bed19f8d837690f57a7a21fff6cf25",
+        "requested_model": "openrouter/openai/gpt-4.1-2025-04-14",
+        "resolved_model": "openai/gpt-4.1-2025-04-14",
+        "response_content_sha256": "bd105910da2b19332b36503096b368ab1ba4b28cacfa9536be2d4410d18ba669",
+        "response_id": "gen-1787451353-2jMDniiJR5zpNlUM2xur",
+        "response_model": "openai/gpt-4.1",
+        "service_tier": "default",
+        "task_id": "task_102",
+        "trial": 0
+      }
+    ],
+    "known_dense_drift_mismatch_count": 0,
+    "model_sampling_drift_mismatch_count": 6424,
+    "raw_route_counters": [
+      {
+        "count": 2249,
+        "model": "qwen/qwen3.8-max",
+        "provider": "Alibaba",
+        "role": "assistant",
+        "service_tier": null
+      },
+      {
+        "count": 652,
+        "model": "openai/gpt-5.2",
+        "provider": "OpenAI",
+        "role": "user",
+        "service_tier": "default"
+      }
+    ],
+    "raw_route_mismatch_count": 0,
+    "remaining_behavior_mismatch_count_after_waiver_scopes": 0,
+    "reward_vector_mismatch_count": 23,
+    "sampling_score_attribution_issue_count": 0,
+    "score_parity": false,
+    "strict_reproduction_parity": false,
+    "structural_mismatch_count": 0,
+    "text_divergence_message_count": 1183,
+    "text_divergence_message_counts": {
+      "assistant": 620,
+      "user": 563
+    },
+    "tool_call_mismatch_count": 1186,
+    "tool_output_mismatch_count": 5238
+  }
+}

@@ -910,3 +910,78 @@
   failure is explicit: reward `41/97` vs `54/97`, 23 task-vector flips, 64
   component differences, 6,195 tool-behavior differences, and 1,196 generated
   participant text differences. Strict and aggregate parity are both false.
+
+## 2026-08-22 - guarded Qwen 3.8 Max trial-0 repeat and parity report
+
+- Published clean evaluation commit
+  `e28b25b8719e743a7ec7f36bb6dbf3a0b5d59bad`, repaired the existing exact
+  22/40 aggregate subset gate by revalidating its immutable candidate under
+  the evaluation-only ancestry guard, and verified the full dry plan. The
+  authoritative OpenRouter credit preflight recorded `$825.9298108689982`
+  remaining against the frozen `$62.2505533` official trial-0 participant-chat
+  cost. The key was never logged, copied, or serialized.
+- Launched exactly:
+
+  ```bash
+  ALLOW_FULL_RUN=1 uv run --frozen --extra knowledge python \
+    reproduction/tau3_banking/run.py full \
+    --output-dir reproduction/tau3_banking/runs/qwen38_full_trial0_repeat \
+    --execute --confirm-paid-api-calls --cost-ceiling-usd 150 \
+    --allow-known-full-shell-drift
+  ```
+
+  The run started `2026-08-23T00:58:35Z`, completed
+  `2026-08-23T02:16:10Z`, and exited 0. Post-run validation proves 97/97 exact
+  task/trial keys, seed `626729`, 97 `user_stop`, zero infrastructure errors,
+  valid protocol and response IDs, zero grading-integrity issues, exact
+  Alibaba Qwen routes for 2,249 responses, exact OpenAI/default GPT-5.2 routes
+  for 652 responses, and the dated OpenAI GPT-4.1 task-102 judge route. Result
+  SHA-256 is
+  `92051d8923946012e609ad1f25cbc6f57754f8a49746e28fc8b9babb3a93e2d3`;
+  manifest SHA-256 is
+  `ea174dcb8464014752ec3f0cbc88415eb0a3de2d1ace7bc6267c565deb2731ce`.
+- **Result is NOT EXACT:** reproduced **43/97 (44.329896907216494%)**
+  versus official trial 0's **54/97 (55.6701030927835%)**, a delta of -11
+  passes / -11.340206185567012 percentage points. Twenty-three tasks flipped:
+  official pass to reproduced failure
+  `005,016,033,040,045,048,049,051,054,059,070,071,072,078,094,096,101`;
+  official failure to reproduced pass `007,008,014,057,090,099`.
+- Strict comparator SHA-256
+  `fce8b34d20aff5745315910623185d453aae68837bd9f7c0e16a6c50e8d9accb`
+  reports 69 component differences, 6,424 behavior differences, 1,183
+  participant-message differences, 1,186 tool-call differences, and 5,238
+  tool-output differences. Configuration, structure, execution manifest, raw
+  routes, judge route, grading integrity, and sampling attribution each have
+  zero issues. All 6,424 behavior differences are causally attributable to
+  model-selected sampling drift, but aggregate parity is false and therefore
+  cannot be waived.
+- Trace boundary audit strengthens the hosted-nondeterminism finding. Forty-
+  seven tasks have byte-identical first generated user text and the same first
+  Qwen prompt-token count as official, yet **0/47** first Qwen outputs match.
+  Across the first GPT-5.2 calls, candidate prompt tokens are exactly 81 lower
+  on 81 tasks and equal on 16, consistent with the known OpenRouter-vs-direct-
+  OpenAI user transport boundary. Provider tokenizer revision, Jinja chat
+  template, and BOS/EOS policy remain unobservable; current-call Qwen thinking
+  is preserved in raw trace and stripped from subsequent history by the same
+  tau2 renderer.
+- Secondary metrics, candidate vs official: generated participant messages
+  `2,901` vs `2,909`; tool calls `3,840` vs `3,604`; observed tool names `18`
+  vs `20`; mean duration `428.2069s` vs `393.5313s`; participant chat cost
+  `$73.70333065` vs `$62.2505533`; Qwen completion/reasoning tokens per
+  generation `734.2939/578.6910` vs `677.3438/512.5318`. The task-102 judge
+  added `$0.10739`; embeddings, Modal, and discarded retry spend are excluded.
+- One live whole-simulation restart occurred on task 054 after Qwen returned
+  an empty final `AssistantMessage` with neither content nor tool calls. The
+  pinned upstream harness retried it and retained only the eventual
+  `user_stop` attempt. This is disclosed as process non-parity: the parity
+  contract permits only typed infrastructure retries, and the discarded
+  attempt's spend is not recoverable from the final checkpoint.
+- Added a deterministic offline analyzer and compact receipt. Metrics receipt
+  SHA-256 is
+  `6ba4b73045ff47414295e5f4b0cbeafc9efbc0d0ab32d5ad69f379ed09e87561`.
+  Generated and visually inspected all four pages of the linked parity PDF;
+  its renderer verified extractable text and all 16 external URI annotations.
+  PDF SHA-256 is
+  `17d6e27ee7c69a43a772a8946aa4315df0f0d0d8b6671d3410486f8b5a65f2be`;
+  PDF QA receipt SHA-256 is
+  `efa1d54729fdb44dcb3c0550648979cc060bff9bcbbb9f6a7755111d4fddb716`.
