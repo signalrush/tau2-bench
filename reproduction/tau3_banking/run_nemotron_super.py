@@ -34,6 +34,9 @@ DEFAULT_CREDENTIAL_CONFIG = Path.home() / ".rllm" / "config.json"
 DEFAULT_RUNS_DIR = HERE / "runs"
 MANIFEST_NAME = "nemotron_super_manifest.json"
 REPORT_NAME = "nemotron_super_report.json"
+BENCHMARK_ID = "tau3_banking_nemotron_3_super"
+DEFAULT_RUN_PREFIX = "nemotron_super"
+EXPECTED_AGENT_PROVIDER = "DeepInfra"
 
 AGENT_MODEL = "openrouter/nvidia/nemotron-3-super-120b-a12b"
 AGENT_RESPONSE_MODEL = "nvidia/nemotron-3-super-120b-a12b"
@@ -298,7 +301,7 @@ def validate_participant_routes(
                 valid_route = route == (
                     "assistant",
                     AGENT_RESPONSE_MODEL,
-                    "DeepInfra",
+                    EXPECTED_AGENT_PROVIDER,
                     None,
                 )
             else:
@@ -637,7 +640,7 @@ def static_manifest(
     )
     return {
         "schema_version": 1,
-        "benchmark": "tau3_banking_nemotron_3_super",
+        "benchmark": BENCHMARK_ID,
         "mode": mode,
         "output_dir": str(output_dir),
         "run_spec": spec,
@@ -681,7 +684,7 @@ def verify_smoke_manifest(
     expected_command = build_command(smoke_spec, output_dir, resume=False)
     smoke_environment = expected_environment(reference)
     if (
-        manifest.get("benchmark") != "tau3_banking_nemotron_3_super"
+        manifest.get("benchmark") != BENCHMARK_ID
         or manifest.get("mode") != "smoke"
         or manifest.get("status") != "completed"
         or manifest.get("exit_code") != 0
@@ -753,7 +756,7 @@ def verify_smoke_manifest(
         if isinstance(routes, list)
         else set()
     )
-    if observed != {("assistant", "DeepInfra"), ("user", "OpenAI")}:
+    if observed != {("assistant", EXPECTED_AGENT_PROVIDER), ("user", "OpenAI")}:
         raise NemotronRunError("Smoke did not prove the exact participant routes")
     return {
         "manifest_path": str(manifest_path),
@@ -873,7 +876,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output_dir.expanduser().resolve()
             if args.output_dir
             else (
-                DEFAULT_RUNS_DIR / f"nemotron_super_{args.mode}_{timestamp}"
+                DEFAULT_RUNS_DIR / f"{DEFAULT_RUN_PREFIX}_{args.mode}_{timestamp}"
             ).resolve()
         )
         results_path = output_dir / "results.json"
