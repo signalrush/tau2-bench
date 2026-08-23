@@ -1024,3 +1024,70 @@
   `billing_not_active`; the ignored host receipt and committed redacted receipt
   have the same SHA-256 above. No full cache, Qwen, user-simulator, judge, or
   Modal call followed.
+
+## 2026-08-22 - exploratory GLM-5.2 trial-zero run
+
+- Added the thin guarded profile `run_glm52.py` and its tests in clean commit
+  `8904806db686ba32420eeac80ced6a9fcc415f7f`, then pushed that commit only to
+  `signalrush/tau2-bench`. The profile keeps the banking task set, GPT-5.2 user
+  simulator, dated GPT-4.1 task-102 judge, `alltools` retrieval, Modal backend,
+  seed `626729`, and concurrency 10. It changes only the participant to
+  `openrouter/z-ai/glm-5.2`, pins `Sail Research` with fallbacks disabled and
+  required-parameter enforcement, and requests temperature 1.0, top-p 1.0,
+  16,384 output tokens, and `xhigh` reasoning.
+- Launched the smoke exactly as:
+
+  ```bash
+  uv run --frozen --extra knowledge python \
+    reproduction/tau3_banking/run_glm52.py smoke \
+    --output-dir \
+    reproduction/tau3_banking/runs/glm52_smoke_8904806_20260823T0415Z \
+    --execute --confirm-paid-api-calls
+  ```
+
+  Task 001 completed `user_stop` and scored 1/1. All route, response-ID,
+  grading, provenance, and cost guards passed: 11 GLM responses used
+  `z-ai/glm-5.2` through `Sail Research`, while three user-simulator responses
+  used `openai/gpt-5.2` through OpenAI/default. Serialized participant cost was
+  `$0.07850293` (`$0.07083268` participant and `$0.00767025` user). Results,
+  manifest, and report SHA-256 values are respectively
+  `af443c4c689be0eaf392a18300084d147572cc58821982e9646c72d0310c9672`,
+  `59f03a0c2914ef8aa2e70e7150747fb5893d4b94f317a1fb7c05f44049fe4ba5`,
+  and `b26d0b5f7f6ee338df48351fb31e64888bb47506cf1eb606bca2bad032352688`.
+- Launched the 97-task x1 run exactly as:
+
+  ```bash
+  uv run --frozen --extra knowledge python \
+    reproduction/tau3_banking/run_glm52.py full \
+    --output-dir \
+    reproduction/tau3_banking/runs/glm52_full_8904806_20260823T0420Z \
+    --smoke-manifest \
+    reproduction/tau3_banking/runs/glm52_smoke_8904806_20260823T0415Z/glm52_manifest.json \
+    --execute --confirm-paid-api-calls
+  ```
+
+  The guarded account-wide preflight at `2026-08-23T04:09:42Z` recorded
+  `$34,010.00` total credits, `$33,742.190922779` total usage, and
+  `$267.809077220998` remaining against the mode's `$100` admission gate.
+  This is an admission check, not an account reservation or hard spend cap.
+- The run later received OpenRouter HTTP 402 errors with
+  `limit_source=openrouter_credits`. It was interrupted by signalling only its
+  resolved remote process group after the failures became persistent; the
+  wrapper finalized `failed` with exit code 130 at
+  `2026-08-23T04:29:12.580051Z`. No evaluation worker remained afterward.
+  The resumable checkpoint contains 95/97 task records: 24 valid `user_stop`
+  trajectories, 71 infrastructure-error placeholders, and two tasks not yet
+  started. The 24 valid records provisionally sum to 15 rewards, but **15/24
+  is not a full-set score and must not be reported as GLM-5.2 performance**.
+  Their serialized costs total `$2.10844035` for GLM and `$0.39937310` for the
+  user simulator; discarded provider retries and infrastructure failures are
+  not represented by those checkpoint totals. The account-level credit loss
+  therefore cannot be attributed to this run from serialized trajectory cost.
+- The stopped checkpoint and failed manifest SHA-256 values are respectively
+  `5128e2dbf895bc00aa877a30933349469199d53d286cba99fbe97e5c6e8afa76`
+  and `97c6be3d2ebba8c81be6f6db05a31a0783aafd9d35f5a50e44087bc336b7698c`.
+  A future continuation must use the same clean commit, smoke manifest, output
+  directory, and command with `--resume`; upstream checkpoint semantics will
+  preserve the 24 validated trajectories and retry only infrastructure-error
+  and missing task keys. It must not start until the guarded credit preflight
+  again covers the selected mode.
