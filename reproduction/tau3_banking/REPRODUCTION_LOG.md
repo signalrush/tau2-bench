@@ -1004,7 +1004,7 @@
   This happened before any Qwen, GPT-5.2 user-simulator, GPT-4.1 judge, or Modal
   call in a new evaluation. The redacted receipt for the latest one-input
   readiness probe is `reports/direct_openai_readiness.json`, SHA-256
-  `3320931c790ae3e379531ac8e664dab0ed0fc37fa20effd8f4f15490c874053a`.
+  `e5278decd94811f4633b7827b458e974a55e7186a2d3640e60888dfccb94f38f`.
 - The next cost gate is therefore explicit: billing must become active for the
   existing credential; then rebuild and fingerprint the complete direct-OpenAI
   cache and compare official dense-query rankings before spending on one smoke
@@ -1020,5 +1020,7 @@
   the exact three model IDs and optionally sends one small embedding input. It
   retains only status, error type/code, and returned dimensionality; it never
   stores the key, raw response, provider message, or embedding values. A second
-  one-input check still returned `billing_not_active`, so no full cache, Qwen,
-  user-simulator, judge, or Modal call followed.
+  one-input check at `2026-08-23T02:58:39.231719+00:00` still returned
+  `billing_not_active`; the ignored host receipt and committed redacted receipt
+  have the same SHA-256 above. No full cache, Qwen, user-simulator, judge, or
+  Modal call followed.
