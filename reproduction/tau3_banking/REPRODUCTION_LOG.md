@@ -985,3 +985,34 @@
   `17d6e27ee7c69a43a772a8946aa4315df0f0d0d8b6671d3410486f8b5a65f2be`;
   PDF QA receipt SHA-256 is
   `efa1d54729fdb44dcb3c0550648979cc060bff9bcbbb9f6a7755111d4fddb716`.
+
+## 2026-08-22 - direct-OpenAI readiness check
+
+- Two complete Qwen trial-0 evaluations now independently score `41/97` and
+  `43/97` against the official `54/97`, with clean deterministic grading and
+  provider-route validation. This is evidence of a systematic parity gap; a
+  third unchanged full run would not be an evidence-backed correction.
+- A read-only host check found `OPENAI_API_KEY` present on the Linux evaluation
+  host. Authenticated model-metadata requests resolved `gpt-5.2`,
+  `gpt-4.1-2025-04-14`, and `text-embedding-3-large`. No key value, key hash,
+  account label, project identifier, response header, or raw credential-bearing
+  request was logged or copied.
+- The first isolated direct-OpenAI operation attempted to build the 698-document
+  `text-embedding-3-large` cache outside the scored checkout cache. OpenAI
+  rejected it before computation with HTTP 429, error type
+  `billing_not_active`; zero embeddings were returned and no cache was written.
+  This happened before any Qwen, GPT-5.2 user-simulator, GPT-4.1 judge, or Modal
+  call in a new evaluation. The redacted readiness receipt is
+  `reports/direct_openai_readiness.json`, SHA-256
+  `b1084410aa9049e52c280d41f62c409c6b894b810c85263e87342415fe395c1d`.
+- The next cost gate is therefore explicit: billing must become active for the
+  existing credential; then rebuild and fingerprint the complete direct-OpenAI
+  cache and compare official dense-query rankings before spending on one smoke
+  or another 97-task x1 run. The original official cache and provider-managed
+  Qwen tokenizer/Jinja revision remain unavailable, so even that path can prove
+  aggregate-score parity but cannot promise byte-identical trajectories.
+- Re-rendered and visually inspected all four report pages after this
+  correction. Updated PDF SHA-256 is
+  `294cc06f807ebac37faeb0865b5e041c5041c51b08599a396083caabbac32035`;
+  updated link/text/page QA receipt SHA-256 is
+  `95013e6ef9cb05bc02ac1bfee695e6367ff7b8d4508d59a0487f84c922fa034a`.

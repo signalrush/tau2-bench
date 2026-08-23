@@ -15,6 +15,16 @@ did not. Read the concise [parity report](./reports/qwen38_trial0_parity.pdf),
 its [Markdown source](./reports/qwen38_trial0_parity.md), and the
 [machine-readable metrics receipt](./reports/qwen38_trial0_metrics.json).
 
+A later readiness check found a direct `OPENAI_API_KEY` on the evaluation host,
+but OpenAI rejected the first isolated cache-build request with
+`billing_not_active`. Model metadata for `gpt-5.2`, the dated GPT-4.1 judge, and
+`text-embedding-3-large` was visible, but no embedding was returned and no
+cache was written. The redacted
+[readiness receipt](./reports/direct_openai_readiness.json) records only those
+facts; it contains no credential or account identifier. No further Qwen run is
+authorized until direct-OpenAI billing, a fresh cache fingerprint, and dense
+retrieval parity are verified.
+
 ## Reference target
 
 - Upstream: `sierra-research/tau2-bench` at

@@ -115,19 +115,19 @@ credential_locator = "file:~/.rllm/config.json#api_keys.openrouter"
 model = "openrouter/openai/gpt-5.2"
 provider = "OpenAI"
 reasoning_effort = "low"
-transport = "OpenRouter Chat Completions; differs from the official direct-OpenAI transport"
+transport = "OpenRouter Chat Completions in the completed run; a later direct-OpenAI credential probe was blocked by inactive billing"
 
 [candidate.judge]
 model = "openrouter/openai/gpt-4.1-2025-04-14"
 provider = "OpenAI"
 temperature = 0.0
 scope = "task_102 only"
-transport = "OpenRouter; differs from the official direct-OpenAI transport"
+transport = "OpenRouter in the completed run; a later direct-OpenAI credential probe was blocked by inactive billing"
 
 [candidate.retrieval]
 variant = "alltools"
 dense_model = "openai/text-embedding-3-large"
-transport = "OpenRouter with a pinned rebuilt cache; the official direct-OpenAI cache is unavailable"
+transport = "OpenRouter with a pinned rebuilt cache; a later direct-OpenAI rebuild returned billing_not_active before producing embeddings"
 
 [candidate.arguments.extra_body.reasoning]
 effort = "xhigh"
