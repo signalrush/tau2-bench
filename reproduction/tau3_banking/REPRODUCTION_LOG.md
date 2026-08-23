@@ -1708,3 +1708,83 @@ sandbox.
 
   The post-run runtime receipt is clean at exact `ce32bb4`. No scored output
   was copied, replayed, removed manually, or cherry-picked.
+
+## 2026-08-23 - Nemotron Super seventh authenticated full resume
+
+- After a further 15-minute no-call cooldown, the execution host confirmed
+  `2026-08-23T15:06:31Z`, beyond the required `15:06:22Z` threshold. The
+  remote worktree was then switched to clean detached validation commit
+  `ce32bb4902da1410514977dde336bfb61ea7cb8d`; both `HEAD` and the freshly
+  fetched fork ref matched that commit. The input checkpoint still matched
+  `a3d4979a40985a90f2e1ad98f54beabecc8ba0b937cfd3831ac49f8f65ce47cb`.
+- Reused the exact guarded resume command:
+
+  ```console
+  uv run --frozen --extra knowledge python reproduction/tau3_banking/run_nemotron_super.py full --output-dir reproduction/tau3_banking/runs/nemotron_full_aa6eaa5 --smoke-manifest reproduction/tau3_banking/runs/nemotron_smoke_aa6eaa5/nemotron_super_manifest.json --resume --execute --confirm-paid-api-calls
+  ```
+
+  The ninth full-manifest launch ran from
+  `2026-08-23T15:07:01.373223+00:00` through
+  `2026-08-23T15:46:18.833540+00:00` at concurrency 10. Its command SHA-256
+  remained
+  `9163f2850b29a79d76b73b4b10a2587c689eaedbc408264fe98ed75713aa8ba8`.
+  Its guarded preflight at `2026-08-23T15:07:00.110986+00:00` recorded
+  `$891.6572302180002` remaining against the `$40` gate. The authenticated
+  checkpoint chain is
+  `a3d4979a40985a90f2e1ad98f54beabecc8ba0b937cfd3831ac49f8f65ce47cb`
+  to
+  `9146f1052d2a53699da7a305d68466e58e8d49f5553c47b249b8c3a75263746e`.
+- Resume validation preserved all 110 earlier validated outcomes and retried
+  only the 84 infrastructure placeholders with their original task/trial
+  seeds. It recovered **seven additional valid `user_stop` outcomes**, all
+  with reward zero: `task_040/0`, `task_045/0`, `task_048/0`, `task_052/0`,
+  `task_055/0`, `task_057/0`, and `task_088/1`. The checkpoint now contains
+  **117 validated outcomes**: 115 `user_stop` plus two honest
+  `too_many_errors`, with **22 passes**. The remaining **77
+  `infrastructure_error` placeholders** all exhausted four task-level
+  attempts: 75 are DeepInfra `RateLimitError` / `engine_overloaded` HTTP-429
+  records and two are transient TLS `SSLV3_ALERT_BAD_RECORD_MAC` `APIError`
+  records (`task_088/0` and `task_066/0`). There are no unclassified errors.
+  The incomplete 22/117 slice is not a benchmark score. Tau2 exited zero; the
+  wrapper correctly exited 2 with `post_run_validation_failed` because
+  placeholders remain, and no report was emitted.
+- Retained serialized checkpoint costs are `$11.807612545` for Nemotron and
+  `$2.3004023` for GPT-5.2 user simulation, or **`$14.108014845` participant
+  subtotal**. This sweep added `$1.08458104` and `$0.16772245` respectively.
+  Two retained task-102 judge records add `$0.096146`, unchanged in this
+  sweep, so all serialized chat cost is `$14.204160845`. These fields exclude
+  rejected attempts, embeddings, and Modal. The free post-run account receipt
+  at `2026-08-23T15:49:00.697645+00:00` recorded `$3,214.051836692` usage and
+  `$885.948163308` remaining. Its `$5.70906691` account-wide delta is not an
+  attributed run-cost total and can include rejected attempts and other
+  account activity.
+- Raw-route audit counted 3,042 retained assistant calls, all resolved to
+  `nvidia/nemotron-3-super-120b-a12b` through DeepInfra, and 759 retained user
+  calls, all resolved to `openai/gpt-5.2` through OpenAI/default. No
+  cost-bearing raw-call metadata is missing. Both retained task-102 judge
+  calls requested `openrouter/openai/gpt-4.1-2025-04-14` and resolved through
+  OpenAI to the dated GPT-4.1 model. Modal remained pinned to image
+  `im-tnDKIdJXoHwMlRrrDMB8FX`; the order-manifest, order, and shell-oracle
+  SHA-256 values remained `5f8005d162f81d9eadf6836b296d4a334090daec60c0228770e8b8de890d37f8`,
+  `ddb11f1a583e408079c136805c786f6e53903afb3dad46047c69a06b3b01b6f3`,
+  and `c2fb4c7612348d40391aeb7ebb8b783046c2183c166efbb755954f2661678c1a`
+  respectively; the acknowledged known-shell drift count remained 11.
+- Final receipts for this partial recovery sweep:
+
+  - `results.json` (62,354,585 bytes):
+    `9146f1052d2a53699da7a305d68466e58e8d49f5553c47b249b8c3a75263746e`
+  - `nemotron_super_manifest.json` (50,293 bytes):
+    `9b81c80df36353027a4092302fbd250c1b201900ee23b4f1b61bca307c6506f7`
+  - post-run execution-state digest:
+    `d7c2d4f54fa714e79f2a0a143791de98548547b5a0323e23f3d6e01c085ce426`
+  - nested clean runtime-tree digest:
+    `e4ccabdff05ad19b0f3c139a4086d6491839112b2b2e42c4dea85cb124e2ffc4`
+
+  The selected embedding-cache digest remains
+  `57d8cce1eba2cbbfe116d5709e079806da6509f2427d01af1eded689c9bae649`;
+  the `src/tau2` object remains
+  `d559853b393a07a73b4da0d3e4ddd43f3ab0e812`. The post-run runtime receipt
+  is clean at exact `ce32bb4`. The manifest's inherited
+  `finalization_error` text is stale from launch 7; current launch status and
+  the fresh post-run receipt are authoritative and clean. No scored output
+  was copied, replayed, removed manually, or cherry-picked.
