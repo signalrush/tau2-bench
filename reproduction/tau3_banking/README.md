@@ -1,11 +1,19 @@
 # tau3 banking reproduction harness
 
-This folder reproduces only the `banking_knowledge` submission
-`qwen3-8-max_sierra_2026-08-04`. It pins the public result, the v1.0.1 data,
-the exact 97-by-4 reward matrix, and the run arguments. Every run command is a
-dry run unless `--execute` and the paid-call acknowledgement are both present.
+This folder supports only the `banking_knowledge` benchmark. It pins the
+public Sierra targets, v1.0.1 data, exact task/trial keys, and guarded Qwen,
+GLM-5.2, and Nemotron run profiles. Every run command is a dry run unless
+`--execute` and the paid-call acknowledgement are both present.
 
 ## Latest x1 outcome
+
+The GLM-5.2 trial-0 run completed at **33/97 (34.0206%)**. Sierra's official
+GLM-5.2 submission is **144/388 (37.1134%)** over four trials, so this is
+**NOT EXACT** parity. Read the [GLM-5.2 PDF report](./reports/glm52_trial0_parity.pdf),
+its [Markdown source](./reports/glm52_trial0_parity.md), and the
+[machine-readable receipt](./reports/glm52_trial0_metrics.json).
+
+### Qwen 3.8 Max
 
 **NOT EXACT:** the guarded 97-task trial-0 repeat completed 97/97 `user_stop`
 trajectories with zero infrastructure errors but scored **43/97 (44.3299%)**,

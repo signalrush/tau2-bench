@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "verdict": "NOT_EXACT",
+  "benchmark": {
+    "domain": "banking_knowledge",
+    "task_count": 97,
+    "upstream_commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992"
+  },
+  "official": {
+    "submission": "glm-5-2_sierra_2026-08-04",
+    "metric": "pass^1 over four trials",
+    "passes": 144,
+    "trajectories": 388,
+    "score_percent": 37.11340206185567,
+    "submission_url": "https://github.com/sierra-research/tau2-bench/blob/0f67910830d0b0168c43637de9ed0d5a355cd56c/web/leaderboard/public/submissions/glm-5-2_sierra_2026-08-04/submission.json",
+    "trajectories_url": "https://sierra-tau-bench-public.s3.us-west-2.amazonaws.com/submissions/glm-5-2_sierra_2026-08-04/trajectories/banking_knowledge_results.json"
+  },
+  "reproduction": {
+    "metric": "single-trial pass rate",
+    "passes": 33,
+    "trajectories": 97,
+    "score_percent": 34.02061855670103,
+    "score_delta_percentage_points": -3.09278350515464,
+    "coverage": {
+      "valid": 97,
+      "expected": 97,
+      "infrastructure_errors": 0,
+      "termination_counts": {
+        "user_stop": 97
+      }
+    },
+    "runtime_commit": "4643dc52d58538e5e897b761d6e061f2edc88a49",
+    "run_directory": "reproduction/tau3_banking/runs/glm52_full_8904806_20260823T0420Z",
+    "assistant_route": {
+      "requested_model": "openrouter/z-ai/glm-5.2",
+      "response_model": "z-ai/glm-5.2",
+      "provider": "Sail Research",
+      "response_count": 2450
+    },
+    "user_simulator_route": {
+      "requested_model": "openrouter/openai/gpt-5.2",
+      "response_model": "openai/gpt-5.2",
+      "provider": "OpenAI",
+      "response_count": 708
+    },
+    "judge": {
+      "scope": "task_102 only",
+      "requested_model": "openrouter/openai/gpt-4.1-2025-04-14",
+      "provider": "OpenAI",
+      "natural_language_assertion_passed": true,
+      "final_task_reward": 0
+    },
+    "serialized_cost_usd": {
+      "assistant": 21.61216452,
+      "user_simulator": 1.93359775,
+      "judge": 0.11268,
+      "total": 23.658442270000002,
+      "excludes": [
+        "embeddings",
+        "Modal",
+        "discarded provider attempts"
+      ]
+    },
+    "sha256": {
+      "results_json": "84c89c9a0a87a5aaf0c6a16998e4333a860ae3d810c815690cf6619c96667774",
+      "manifest_json": "639cc89544a4aa72bf7c16c89770825cb406ed00f6f7e16e7effbaa6ee0ea942",
+      "report_json": "f5c21ac6869c2be2c20c78e68f1e6695cee321e8a1ab346833198284c4a3caed",
+      "validated_coverage": "b503c87e6d607ae4c8abc98a98ac2dc09bf3862a0640e9ed353b12ae922f43d2",
+      "participant_response_ids": "635b9a31cf9088fabc4294c40a3ce2886aeba66fc88682a1e3032aa8bf595b1f",
+      "judge_response_ids": "26411e877388b8cbb76007f210c2b7ef4207467be73f92b067835dbde4688fff"
+    }
+  },
+  "parity_gaps": [
+    "The reproduction contains one trial; the official Sierra submission contains four.",
+    "The aggregate score differs by 3.09278350515464 percentage points.",
+    "Official and reproduced trajectory rendering, provider route, tool usage, and per-task reward vectors have not yet been compared end to end."
+  ]
+}

@@ -1936,3 +1936,49 @@ sandbox.
   another resume, before `2026-08-23T19:25:46Z`. At or after that host-clock
   threshold, repeat the clean-commit, exact-checkpoint, and guarded-credit
   gates before retrying only the 77 infrastructure keys.
+
+## 2026-08-23 - published GLM-5.2 trial-zero parity report
+
+- Identified the immutable Sierra GLM-5.2 submission as the authoritative
+  target for this `alltools` plus GPT-5.2 contract:
+  `glm-5-2_sierra_2026-08-04`, **144/388 = 37.11340206185567%** over 97
+  tasks and four trials. The completed reproduction is **33/97 =
+  34.02061855670103%** over one trial, a rate delta of
+  **-3.09278350515464 percentage points**. The report verdict is therefore
+  **NOT EXACT**; the completed x1 run is not relabeled as official parity.
+- Audited the frozen runner and renderer configuration, including the 17-tool
+  initial schema, `alltools`, seed 300, the single derived trial seed, route
+  counts, task-102 judge, reasoning-history boundary, Modal sandbox, costs,
+  coverage, and result receipts. The official 329 MB trajectory artifact is
+  linked but was not copied during this report pass. Official-vs-candidate
+  per-task rewards, messages, tool usage, route metadata, and renderer details
+  remain explicitly unverified in the report rather than inferred.
+- Created the concise human and machine-readable artifacts:
+  `reports/glm52_trial0_parity.md`, `reports/glm52_trial0_parity.pdf`,
+  `reports/glm52_trial0_parity.receipt.json`, and
+  `reports/glm52_trial0_metrics.json`. The exact render command was:
+
+  ```console
+  uv run reproduction/tau3_banking/render_parity_report.py reproduction/tau3_banking/reports/glm52_trial0_parity.md reproduction/tau3_banking/reports/glm52_trial0_parity.pdf --pages-dir reproduction/tau3_banking/reports/glm52_trial0_parity-pages
+  ```
+
+  Verification found three pages, extractable text, no replacement glyphs,
+  15/15 external link annotations, and three nonempty rendered PNGs. Every
+  page was visually inspected; no clipping, overlap, unreadable code, broken
+  table, or awkward trailing page remained.
+- Final report hashes:
+
+  - machine-readable metrics:
+    `398ab2323e1e0824a8a715d450504d562d7edb8f8cf603f37101157e9c647644`
+  - Markdown source:
+    `44893045f8d86a6bf4664a0a854bc00ef16f4c763efe2616da91154af652a360`
+  - rendered PDF:
+    `fb8b00d06e3567ffcb0d8f751b8ebf7e81e67e955ae2c557fe594b36c2ba34b7`
+  - PDF QA receipt:
+    `c927f055d531bbcbd8d8ae6cf2f229fc459ca67b795b31f63f3c58a5ba384c4a`
+  - renderer:
+    `d3caabd66b37787f607ab040fc1f541a6e6f37866bb124ec73a19491b4032957`
+
+  Report authoring and rendering were local, read-only with respect to the
+  evaluation host, and made no credential, model, embedding, or Modal call
+  during the active Nemotron cooldown.

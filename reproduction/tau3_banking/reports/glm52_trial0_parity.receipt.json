@@ -1,0 +1,12 @@
+{
+  "expected_external_link_count": 15,
+  "page_count": 3,
+  "pages_dir": "reproduction/tau3_banking/reports/glm52_trial0_parity-pages",
+  "pdf": "reproduction/tau3_banking/reports/glm52_trial0_parity.pdf",
+  "pdf_sha256": "fb8b00d06e3567ffcb0d8f751b8ebf7e81e67e955ae2c557fe594b36c2ba34b7",
+  "receipt": "reproduction/tau3_banking/reports/glm52_trial0_parity.receipt.json",
+  "renderer_sha256": "d3caabd66b37787f607ab040fc1f541a6e6f37866bb124ec73a19491b4032957",
+  "source": "reproduction/tau3_banking/reports/glm52_trial0_parity.md",
+  "source_sha256": "44893045f8d86a6bf4664a0a854bc00ef16f4c763efe2616da91154af652a360",
+  "verified_external_link_count": 15
+}
