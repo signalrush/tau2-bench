@@ -1539,6 +1539,17 @@ sandbox.
     tests/test_tau3_banking_nemotron_super.py
   ```
 
-  Result: **107 passed**. The existing evaluation-only commit-delta guard will
-  bind this validator correction to the unchanged `aa6eaa5` checkpoint and
-  smoke receipt; no scored output is copied, replayed, or modified.
+  Result: **107 passed** on the tracking branch. A subsequent offline
+  checkpoint validation from that branch correctly rejected its later
+  `src/tau2` embedding-transport changes as outside the evaluation-only
+  allowlist, rather than silently treating them as the `aa6eaa5` runtime.
+- Applied the byte-identical one-file validator fix directly atop `aa6eaa5` as
+  dedicated fork branch `agent/tau3-banking-nemotron-aa6-route-guard`, commit
+  `60b6869057eac3500c008ff71163e613be3cf331`. Its complete parent-to-HEAD diff
+  is only `reproduction/tau3_banking/compare_results.py`; the candidate
+  harness, user simulator, grading, retrieval, embeddings, Modal backend,
+  data, and configuration remain the exact checkpoint-producing runtime. The
+  older-runtime offline suites pass **95/95** when explicitly imported from
+  that worktree. The evaluation-only commit-delta guard can therefore bind
+  the fix to the unchanged checkpoint and smoke receipt without copying,
+  replaying, or modifying any scored output.
