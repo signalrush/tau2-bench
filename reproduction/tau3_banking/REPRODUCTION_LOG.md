@@ -1400,3 +1400,68 @@ sandbox.
   actual resume above began from clean commit `aa6eaa5`, and the evaluation
   host was restored afterward to clean published branch
   `agent/tau3-banking-modal-parity` at `a3c10af`.
+
+## 2026-08-23 - Nemotron Super second authenticated full resume
+
+- A fresh numeric-only preflight at `2026-08-23T08:24:51.942015+00:00`
+  recorded `$932.5895790680001` remaining against the `$40` mode gate.
+  OpenRouter's public endpoint metadata simultaneously reported DeepInfra at
+  100% uptime over both five and thirty minutes, so the exact same authenticated
+  resume command above was launched again from clean detached runtime
+  `aa6eaa5cffadb6f7f470b2235caa543d998e6e01`. No fallback, replay, output
+  transplant, or selective scored rerun was used.
+- The fourth guarded launch ran from `2026-08-23T08:25:34.966225+00:00` to
+  `2026-08-23T09:21:30.382123+00:00` at concurrency 10. Its checkpoint chain is
+  `ffa48719b0a90ac93dd62086a49088cdb285ac495cab5ce0781dfd95c11f53c7`
+  to
+  `5c1598df0f1e7f9a1e6c3906063cfb6701a8fa87892f032467f51bbc52e787c9`.
+  Upstream auto-resume removed only the 182 prior infrastructure placeholders
+  and preserved all 12 validated outcomes.
+- This launch recovered **17 additional valid `user_stop` trajectories**, six
+  of which passed. The retained checkpoint is now **29 validated outcomes**
+  (28 `user_stop`, one honest `too_many_errors`) with **9 passes**, plus **165
+  `infrastructure_error` placeholders**. The incomplete 9/29 slice is not a
+  full benchmark score. Of the placeholders, 163 finalized as DeepInfra
+  `RateLimitError` records after four task-level attempts and two
+  (`task_062` trial 0 and `task_084` trial 1) finalized after four transient
+  TLS `SSLV3_ALERT_BAD_RECORD_MAC` attempts. The parity wrapper correctly
+  exited 2 with `post_run_validation_failed`; upstream itself exited zero.
+- Current retained serialized costs are `$3.244877265` for Nemotron and
+  `$0.37877279999999997` for the user simulator, or `$3.623650065` total.
+  This launch added `$2.126436105` and `$0.2335158` respectively. The free
+  post-run account receipt at `2026-08-23T09:22:13.740863+00:00` recorded
+  `$3,174.755272102` usage and `$925.2447278979998` remaining; its
+  `$7.34485117` account-wide delta is not an attributed run-cost total and can
+  include rejected attempts and other account activity.
+- Final receipts for this partial recovery sweep:
+
+  - `results.json`:
+    `5c1598df0f1e7f9a1e6c3906063cfb6701a8fa87892f032467f51bbc52e787c9`
+  - `nemotron_super_manifest.json`:
+    `85fe6a01d2b8fbb44bbe2bca90d2420ebcd74409fb92a76aed35ee15fb9f1698`
+
+  The evaluation host was restored to clean published branch
+  `agent/tau3-banking-modal-parity` at `f486fd0` after finalization.
+
+## 2026-08-23 - authoritative Nemotron target and parity status
+
+- Artificial Analysis's current official model page embeds
+  `tauBanking = 0.103092783505155` for **Nemotron 3 Super 120B A12B
+  (Reasoning)**:
+  <https://artificialanalysis.ai/models/nvidia-nemotron-3-super-120b-a12b/>.
+  Its current methodology specifies 97 tasks with five repeats, so the exact
+  aggregate is **50/485 = 10.3092783505155%**:
+  <https://artificialanalysis.ai/methodology/intelligence-benchmarking#tau3-banking>.
+- The current Artificial Analysis v4.1.1 contract uses upstream tau2-bench
+  v1.0.1, `bm25_grep` retrieval, GPT-5.4 Mini with medium reasoning for both
+  user simulation and the task-102 NL judge, and at most 200 harness steps per
+  repeat. Artificial Analysis does not publicly disclose the five exact seeds,
+  policy provider, complete Nemotron request arguments, chat template/thinking
+  history policy, invocation command, or trajectories.
+- Therefore this user-requested run (97 tasks x2, `alltools`, GPT-5.2 low user,
+  dated GPT-4.1 task-102 judge, and forced DeepInfra route) is a valid measured
+  evaluation but **NOT EXACT Artificial Analysis parity**. Even a coincidental
+  20/194 score would not reproduce 50/485 or the official harness contract.
+  NVIDIA NeMo Gym documents the same 97x5 AA-shaped setup but removes the
+  task-102 NL assertion, so its no-judge output is also not scoring-identical:
+  <https://github.com/NVIDIA-NeMo/Gym/blob/main/benchmarks/tau2/README.md>.
