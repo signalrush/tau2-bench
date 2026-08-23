@@ -1597,8 +1597,10 @@ sandbox.
     `e02ab901d08e016bd5342f27eb2de7ecf21f821251e47220e1e4c04e7beac0f1`
   - `nemotron_super_manifest.json`:
     `754b075c1e2832b2e0533eac417b58ed9bf376a12fb95c049afd0ef7bfde3d42`
-  - post-run runtime digest:
+  - post-run execution-state digest:
     `d7c2d4f54fa714e79f2a0a143791de98548547b5a0323e23f3d6e01c085ce426`
+  - nested clean runtime-tree digest:
+    `e4ccabdff05ad19b0f3c139a4086d6491839112b2b2e42c4dea85cb124e2ffc4`
 
   The current post-run execution fingerprint passed against the clean
   `ce32bb4` runtime. The manifest still carries a stale `finalization_error`
