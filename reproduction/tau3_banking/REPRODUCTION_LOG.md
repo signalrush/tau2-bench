@@ -902,3 +902,11 @@
   intervening path is in the guarded allowlist. This keeps the original scoring
   commit in the result while allowing the bound endpoint inventory to be
   trusted for route validation; non-evaluation code drift remains fatal.
+- Re-ran the complete offline comparator in place on the Linux evaluation
+  host after publication. Report SHA-256
+  `c59a54a7406c15e80971210c734c457a4672e6a4e5d3f633cd95be8b60c9eb83`
+  proves configuration, structure, execution-manifest, raw participant routes,
+  task-102 judge route, and grading integrity all pass with zero issues. The
+  failure is explicit: reward `41/97` vs `54/97`, 23 task-vector flips, 64
+  component differences, 6,195 tool-behavior differences, and 1,196 generated
+  participant text differences. Strict and aggregate parity are both false.
