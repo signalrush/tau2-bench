@@ -1189,3 +1189,85 @@ runs $68.33 + $73.70, the 40-run subset gate $10.77, the earlier subset
 $11.93, plus interrupted/partial runs. An interrupted four-trial full run
 (`full_6c4aa41`) was cancelled after the owner reduced scope to one trial;
 its in-flight simulations were paid for but not serialized.
+
+## 2026-08-22 — CORRECTION: embeddings were never the cause
+
+An owner-supplied direct-OpenAI key made the decisive experiment possible.
+The previous entry attributed the 41–43/97 deficit to OpenRouter-vs-OpenAI
+dense-embedding drift. **That conclusion was wrong** and is retracted here.
+
+### The two caches are numerically equivalent
+
+Built the 698-document cache on the official transport (direct OpenAI,
+`text-embedding-3-large`, ~$0.13) and compared it row-by-row against the
+OpenRouter cache that both full runs actually used, aligned by document ID:
+
+- mean cosine `0.99997339`, median `1.00000000`, min `0.99736280`
+- documents below cosine 0.9999: 33/698; below 0.99: **0/698**
+
+OpenRouter genuinely proxies to OpenAI; the vectors are the same to within
+float noise.
+
+### Retrieval parity does not improve
+
+Head-to-head on the 444 official trial-0 dense queries, with query embeddings
+held constant so only the document cache varies:
+
+| document cache | exact top-k order | top-1 | doc overlap |
+|---|---|---|---|
+| OpenRouter (used by both runs) | 296/444 (66.7%) | 99.3% | 99.03% |
+| direct OpenAI (official transport) | 308/444 (69.4%) | 99.1% | 99.01% |
+
+Switching to the official transport moves exact ordering by +2.7 points while
+top-1 and set overlap move −0.23 and −0.02 points. That is noise, not a fix.
+The residual ~30% ordering difference is tie-breaking between near-identical
+scores (mean |Δscore| on top-1 is `0.00029`), not a content difference: the
+retrieved document *set* is ~99% identical either way.
+
+Note also that the cache-loading path is correct: `EmbeddingsCache.get`
+remaps rows by document ID, so the OpenRouter cache's macOS-order storage was
+never mis-mapped to documents.
+
+### Independent evidence that retrieval is not the mechanism
+
+- The deficit is **largest on the tasks needing the least retrieval**:
+  −23.5 points on low-retrieval tasks (≤10 search calls), −12.0 mid, −10.0
+  high. A retrieval defect would show the opposite gradient.
+- On our wrong decisive arguments (account class, card type, amount), the
+  gold value was present in the agent's own retrieved context **12/12 times**.
+  Nothing needed was missing.
+- Competing product names visible in context are no denser in our runs than
+  official's (−0.7 and −0.3 on average).
+
+### What the evidence now says
+
+Everything testable is faithful: agent policy byte-identical on all 97 tasks,
+identical model/args/routes, 581/595 identical outputs for identical
+non-retrieval tool calls (the 14 differences are all path-dependent state),
+shell healthier than the historical backend, comparable user simulator, and —
+on 39 tasks where the agent's input is byte-identical (prompt_tokens equal
+4568.0 in 39/39) — the same first-tool distribution
+(`KB_search_dense` 24 vs 23, `KB_search_bm25` 13 vs 14), so no measurable
+model drift.
+
+The deficit has a precise shape instead:
+
+| official 4-trial rate | n | expected | run A | run B |
+|---|---|---|---|---|
+| 4/4 | 34 | 34.0 | 25 | 27 |
+| 3/4 | 18 | 13.5 | 9 | 9 |
+| 2/4 | 5 | 2.5 | 2 | 3 |
+| 1/4 | 14 | 3.5 | 4 | 4 |
+| 0/4 | 26 | 0.0 | 1 | 0 |
+
+We match official *exactly* on every task it finds hard, and lose ~25% of the
+tasks it solves reliably. Our two runs fail largely disjoint subsets of those
+(9 and 7, overlap 3, versus 2.0 expected under independence), so it is a
+random per-simulation fault, not a deterministic one. Failing simulations also
+run far longer than passing ones (434s and 557s vs 237s and 260s; official
+averages 264s on the same tasks).
+
+That signature — reliable tasks failing intermittently, long unproductive
+trajectories, no missing information, no config or model difference — is the
+open question. It is not retrieval, not embeddings, not grading, and not the
+sandbox.

@@ -10,5 +10,17 @@
     "embedder_hash": "c88535dfbd6d8cdab06bc712168ee9cb",
     "created_at": "2026-08-22T08:46:24.921102",
     "file_size_mb": 16.391493797302246
+  },
+  "62eca72522cacac783980da07ba707af2dfa2df0aec9def44ea0fcb260127fc2_42b9e29f6ad9cba8e600e96b1a813aab": {
+    "embedder_type": "openai",
+    "embedder_config": {
+      "model": "text-embedding-3-large",
+      "_transport": "direct-openai-provider-v1"
+    },
+    "num_documents": 698,
+    "doc_hash": "62eca72522cacac783980da07ba707af2dfa2df0aec9def44ea0fcb260127fc2",
+    "embedder_hash": "42b9e29f6ad9cba8e600e96b1a813aab",
+    "created_at": "2026-08-23T04:48:35.092017",
+    "file_size_mb": 16.39148998260498
   }
 }
