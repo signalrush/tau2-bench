@@ -1091,7 +1091,6 @@
   preserve the 24 validated trajectories and retry only infrastructure-error
   and missing task keys. It must not start until the guarded credit preflight
   again covers the selected mode.
-||||||| parent of 84c84cb (docs: root-cause analysis of the 41-43/97 vs 54/97 deficit)
 ## 2026-08-22 — trace analysis: the deficit is systematic, and its mechanism
 
 Two independent guarded single-trial runs (both `completed`, exit 0, same
@@ -1271,3 +1270,79 @@ That signature — reliable tasks failing intermittently, long unproductive
 trajectories, no missing information, no config or model difference — is the
 open question. It is not retrieval, not embeddings, not grading, and not the
 sandbox.
+
+## 2026-08-23 - completed GLM-5.2 trial-zero run
+
+- Replaced only the authoritative OpenRouter credential in
+  `~/.rllm/config.json` on the evaluation host. The key was entered with
+  terminal echo disabled, written atomically with mode `0600`, and was never
+  printed or copied into a command, artifact, or log. The first guarded check
+  for the new account at `2026-08-23T04:39:05.865680+00:00` recorded
+  `$4,100.00` total credit, `$3,135.067771202` usage, and
+  `$964.9322287979999` remaining against the full mode's `$100` gate.
+- Continued the existing checkpoint with this exact authenticated command:
+
+  ```bash
+  uv run --frozen --extra knowledge python \
+    reproduction/tau3_banking/run_glm52.py full \
+    --output-dir \
+    reproduction/tau3_banking/runs/glm52_full_8904806_20260823T0420Z \
+    --smoke-manifest \
+    reproduction/tau3_banking/runs/glm52_smoke_8904806_20260823T0415Z/glm52_manifest.json \
+    --resume --execute --confirm-paid-api-calls
+  ```
+
+  The same command was used for every cleanup launch. Upstream auto-resume
+  skipped every validated task and retried only infrastructure placeholders;
+  no output was replayed, copied, or cherry-picked. The four guarded launch
+  receipts form the checkpoint chain
+  `null -> 5128e2db... -> 09f4c0a9... -> 03a69db5... -> 84c89c9a...`.
+- The paid continuation first reached 92 valid trajectories and five
+  placeholders (`task_073`, `task_074`, `task_082`, `task_090`, and
+  `task_091`). The next cleanup reached 95 valid with only `task_074` and
+  `task_082` remaining. The final cleanup reached 97/97. Across these
+  post-credit launches, 36 attempts were discarded for a provider response
+  with an empty terminal assistant message and nine for transient TLS
+  `SSLV3_ALERT_BAD_RECORD_MAC`; discarded attempt spend is not serialized in
+  `results.json`. No 429, 402, route fallback, grading error, or Modal failure
+  occurred after the new account was installed. The earlier interrupted
+  checkpoint's 71 HTTP-402 placeholders and two missing tasks remain recorded
+  separately above.
+- A later commit (`74a3907`) changed committed embedding-cache metadata after
+  this evaluation had started. The smoke/runtime guard correctly rejected one
+  cleanup attempt before its credit, model, embedding, or Modal calls. Cleanup
+  therefore ran from clean commit
+  `4643dc52d58538e5e897b761d6e061f2edc88a49`, the exact prior evaluation
+  runtime accepted by the original `8904806` smoke receipt. The checkout was
+  restored to the published branch afterward. No guard was weakened and no
+  cache or result was transplanted.
+- Final validation passed with exactly **97/97** completed trajectories, zero
+  infrastructure errors, and 97 `user_stop` terminations. The score is
+  **33/97 = 34.02061855670103%**. Participant routing is exact: 2,450
+  assistant responses used `z-ai/glm-5.2` through `Sail Research`, and 708
+  user-simulator responses used `openai/gpt-5.2` through OpenAI/default.
+  `task_102` used the required dated judge
+  `openrouter/openai/gpt-4.1-2025-04-14`, resolved to OpenAI, and its NL
+  assertion passed; its overall trajectory reward remained zero because the
+  DB check failed.
+- Retained serialized costs are `$21.61216452` for GLM-5.2,
+  `$1.93359775` for GPT-5.2 user simulation, and `$0.11268` for the dated
+  GPT-4.1 judge: **`$23.658442270000002` total**. This excludes embeddings,
+  Modal, and discarded attempts. The free post-run account check at
+  `2026-08-23T08:08:07.358831+00:00` recorded `$3,165.241331872` usage and
+  `$934.758668128` remaining against the Nemotron mode's `$40` gate. Account
+  usage is account-wide and is not used as an attributed run-cost total.
+- Final SHA-256 receipts:
+
+  - `results.json`:
+    `84c89c9a0a87a5aaf0c6a16998e4333a860ae3d810c815690cf6619c96667774`
+  - `glm52_manifest.json`:
+    `639cc89544a4aa72bf7c16c89770825cb406ed00f6f7e16e7effbaa6ee0ea942`
+  - `glm52_report.json`:
+    `f5c21ac6869c2be2c20c78e68f1e6695cee321e8a1ab346833198284c4a3caed`
+  - validated coverage:
+    `b503c87e6d607ae4c8abc98a98ac2dc09bf3862a0640e9ed353b12ae922f43d2`
+  - participant response IDs:
+    `635b9a31cf9088fabc4294c40a3ce2886aeba66fc88682a1e3032aa8bf595b1f`
+  - judge response IDs:
+    `26411e877388b8cbb76007f210c2b7ef4207467be73f92b067835dbde4688fff`
