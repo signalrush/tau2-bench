@@ -1860,3 +1860,79 @@ sandbox.
   current launch status and the fresh post-run receipt are authoritative and
   clean. No scored output was copied, replayed, removed manually, or
   cherry-picked.
+
+## 2026-08-23 - Nemotron Super ninth authenticated full resume
+
+- After the preceding zero-recovery edge, enforced a one-hour no-call
+  cooldown. The execution host confirmed `2026-08-23T17:21:26Z`, beyond the
+  required `17:21:09Z` threshold, with no credential, API, model, embedding,
+  Modal, repository, or evaluation access during the hold. The remote
+  worktree was then switched back to clean detached validation commit
+  `ce32bb4902da1410514977dde336bfb61ea7cb8d`; `HEAD` and the freshly fetched
+  fork ref matched, and the input checkpoint still matched
+  `ee58c40d2126370c67d29656155dbba7ddcf71949318876ac260f9265f718991`.
+- Reused the exact guarded resume command:
+
+  ```console
+  uv run --frozen --extra knowledge python reproduction/tau3_banking/run_nemotron_super.py full --output-dir reproduction/tau3_banking/runs/nemotron_full_aa6eaa5 --smoke-manifest reproduction/tau3_banking/runs/nemotron_smoke_aa6eaa5/nemotron_super_manifest.json --resume --execute --confirm-paid-api-calls
+  ```
+
+  The eleventh full-manifest launch ran from
+  `2026-08-23T17:21:56.071305+00:00` through
+  `2026-08-23T17:25:45.943242+00:00` at concurrency 10. Its command SHA-256
+  remained
+  `9163f2850b29a79d76b73b4b10a2587c689eaedbc408264fe98ed75713aa8ba8`.
+  Its guarded preflight at `2026-08-23T17:21:54.737842+00:00` recorded
+  `$885.2247839629999` remaining against the `$40` gate. The authenticated
+  checkpoint chain is
+  `ee58c40d2126370c67d29656155dbba7ddcf71949318876ac260f9265f718991`
+  to
+  `ed395dd17e2b923a5300a980e644274fe91ce8da0b9f6edfb2ef918487b977d4`.
+- Resume validation preserved all 117 earlier validated outcomes and retried
+  only the exact 77 infrastructure placeholders with their original
+  task/trial seeds. This sweep again recovered **zero** trajectories. The
+  checkpoint remains **117 validated outcomes**: 115 `user_stop` plus two
+  honest `too_many_errors`, with **22 passes**. The exact 77-key retry set is
+  unchanged. All 77 refreshed error outcomes are now DeepInfra
+  `RateLimitError` / `engine_overloaded` HTTP-429 records from the upstream
+  shared pool, and all exhausted four task-level attempts; no TLS or other
+  error remains. The incomplete 22/117 slice is not a benchmark score. Tau2
+  exited zero; the wrapper correctly exited 2 with
+  `post_run_validation_failed`, and no report was emitted.
+- The checkpoint still has exactly 194 unique task/trial keys and 194 unique
+  simulation IDs, with no duplicate, missing, unexpected, or trial-seed
+  mismatches. Retained costs and routes are unchanged: `$11.807612545` for
+  Nemotron, `$2.3004023` for GPT-5.2 user simulation, `$14.108014845`
+  participant subtotal, two dated GPT-4.1 judge records totaling `$0.096146`,
+  and **`$14.204160845` all serialized chat cost**. The effective serialized
+  sweep delta is zero. All 3,042 retained assistant calls remain DeepInfra
+  Nemotron, all 759 retained user calls remain OpenAI GPT-5.2, and both judges
+  remain dated GPT-4.1 through OpenAI.
+- The free post-run account receipt at
+  `2026-08-23T17:27:49.800595+00:00` recorded `$3,215.438576347` usage and
+  `$884.561423653` remaining. Its `$0.66336031` account-wide delta is not an
+  attributed run-cost total; in this second zero-recovery sweep it primarily
+  reflects rejected attempts and can also include other account activity.
+- Final receipts for this zero-recovery sweep:
+
+  - `results.json` (62,354,772 bytes):
+    `ed395dd17e2b923a5300a980e644274fe91ce8da0b9f6edfb2ef918487b977d4`
+  - `nemotron_super_manifest.json` (58,301 bytes):
+    `c6faa73075c7d76b0fc9d267bd9d16c1868a3a39ab4335bc752d48b62ac52fa6`
+  - post-run execution-state digest:
+    `d7c2d4f54fa714e79f2a0a143791de98548547b5a0323e23f3d6e01c085ce426`
+  - nested clean runtime-tree digest:
+    `e4ccabdff05ad19b0f3c139a4086d6491839112b2b2e42c4dea85cb124e2ffc4`
+
+  The selected embedding cache, Modal identity/order/shell receipts,
+  `src/tau2` object, and clean exact-`ce32bb4` runtime remain unchanged. The
+  manifest's inherited `finalization_error` text remains stale from launch 7;
+  current launch status and the fresh post-run receipt are authoritative and
+  clean. No scored output was copied, replayed, removed manually, or
+  cherry-picked.
+- Because launches 10 and 11 both recovered zero trajectories despite a
+  one-hour separation, the next parity-safe action is a longer **two-hour
+  no-call cooldown**. Do not make a model, embedding, or Modal call, or start
+  another resume, before `2026-08-23T19:25:46Z`. At or after that host-clock
+  threshold, repeat the clean-commit, exact-checkpoint, and guarded-credit
+  gates before retrying only the 77 infrastructure keys.
