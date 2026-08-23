@@ -1659,3 +1659,52 @@ sandbox.
 
   The post-run runtime receipt is clean at exact `ce32bb4`. No scored output
   was copied, replayed, removed manually, or cherry-picked.
+
+## 2026-08-23 - Nemotron Super sixth authenticated full resume
+
+- After another 15-minute no-call cooldown, reused the exact guarded resume
+  command from clean detached validation runtime
+  `ce32bb4902da1410514977dde336bfb61ea7cb8d`. The eighth full-manifest launch
+  ran from `2026-08-23T13:57:07.936786+00:00` through
+  `2026-08-23T14:51:21.410564+00:00` at concurrency 10. Its command SHA-256
+  remained
+  `9163f2850b29a79d76b73b4b10a2587c689eaedbc408264fe98ed75713aa8ba8`.
+  Its own preflight recorded `$899.2746169279999` remaining against the `$40`
+  gate. The authenticated checkpoint chain is
+  `36838859c8dbb556a3344ff05987aee7d94f7288bd6ad65291d3d2d76ab9ea6d`
+  to
+  `a3d4979a40985a90f2e1ad98f54beabecc8ba0b937cfd3831ac49f8f65ce47cb`.
+- Resume validation preserved all 95 earlier validated outcomes and retried
+  only the 99 infrastructure placeholders with their original task/trial
+  seeds. It recovered **15 additional valid `user_stop` outcomes**, with three
+  additional passes. The checkpoint now contains **110 validated outcomes**:
+  108 `user_stop` plus two honest `too_many_errors`, with **22 passes**. The
+  remaining **84 `infrastructure_error` placeholders** all exhausted four
+  task-level attempts: 82 are DeepInfra `RateLimitError` /
+  `engine_overloaded` HTTP-429 records and two are transient TLS
+  `SSLV3_ALERT_BAD_RECORD_MAC` `APIError` records. The incomplete 22/110 slice
+  is not a benchmark score. Tau2 exited zero; the wrapper correctly exited 2
+  with `post_run_validation_failed` because placeholders remain.
+- Retained serialized checkpoint costs are `$10.723031505` for Nemotron and
+  `$2.13267985` for GPT-5.2 user simulation, or **`$12.855711355` participant
+  subtotal**. This sweep added `$2.04573588` and `$0.2787953` respectively.
+  Two retained task-102 judge records add `$0.096146`, unchanged in this sweep,
+  so all serialized chat cost is `$12.951857355`. These fields exclude rejected
+  attempts, embeddings, and Modal. The free post-run account receipt at
+  `2026-08-23T14:52:04.536981+00:00` recorded `$3,208.342769782` usage and
+  `$891.6572302180002` remaining. Its `$7.61738671` account-wide delta is not an
+  attributed run-cost total and can include rejected attempts and other
+  account activity.
+- Final receipts for this partial recovery sweep:
+
+  - `results.json` (57,568,987 bytes):
+    `a3d4979a40985a90f2e1ad98f54beabecc8ba0b937cfd3831ac49f8f65ce47cb`
+  - `nemotron_super_manifest.json` (46,406 bytes):
+    `048c9740a3466edba0adce18195daee74fa31c342b490254bc05f82fa991d520`
+  - post-run execution-state digest:
+    `d7c2d4f54fa714e79f2a0a143791de98548547b5a0323e23f3d6e01c085ce426`
+  - nested clean runtime-tree digest:
+    `e4ccabdff05ad19b0f3c139a4086d6491839112b2b2e42c4dea85cb124e2ffc4`
+
+  The post-run runtime receipt is clean at exact `ce32bb4`. No scored output
+  was copied, replayed, removed manually, or cherry-picked.
