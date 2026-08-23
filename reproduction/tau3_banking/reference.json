@@ -164,6 +164,7 @@
       "total": 8.8420123
     },
     "gate_subset_after_resumed_smoke": 8.70008305,
+    "full_97_trial_0": 62.2505533,
     "full_97_all_4_trials": 246.13332615
   },
   "modes": {
@@ -239,8 +240,12 @@
       ],
       "expected_simulation_count": 97,
       "expected_reward_sum": 54,
-      "historical_chat_cost_usd": 61.5333315375,
-      "scope_note": "Owner-directed single-trial full evaluation (2026-08-22): trial 0 with derived seed 626729 across all 97 tasks. The official trial-0 slice sums to exactly 54/97 (55.6701%); the published 214/388 pass@1 is the four-trial figure. The credit requirement is one quarter of the recorded four-trial chat cost."
+      "expected_reward_by_trial": [
+        54
+      ],
+      "expected_pass_rate": 55.6701030927835,
+      "historical_chat_cost_usd": 62.2505533,
+      "scope_note": "Owner-directed single-trial full evaluation (2026-08-22): trial 0 with derived seed 626729 across all 97 tasks. The official trial-0 slice sums to exactly 54/97 (55.6701030927835%); the published 214/388 pass@1 is the four-trial figure. The credit requirement uses the exact $62.2505533 serialized participant-chat cost of official trial 0, excluding embeddings, the task_102 NL judge, and Modal."
     }
   },
   "live_parity_checks": {

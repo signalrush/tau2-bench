@@ -240,17 +240,31 @@ The reviewed residuals are three traversal-order differences, four randomized
 working-directory paths, two permission-code differences, one explicit-path
 `ls` metadata difference, and one `srt` conditional-shell difference.
 
-Full mode is deliberately hard to trigger. It requires the current gate,
-`ALLOW_FULL_RUN=1`, the two paid-run flags, and a cost ceiling above the
-historical $246.13 chat cost:
+## Qwen 3.8 Max full trial-0 reproduction
+
+The immutable one-trial target is trial 0 of the public 388-trajectory
+artifact: **54/97 = 55.6701030927835%**, seed `626729`. Its exact serialized
+participant-chat cost is `$62.2505533`; this excludes Modal, embeddings, and
+task 102's dated GPT-4.1 judge. The reproduction remains distribution-level
+because the available credential routes the user simulator, judge, and dense
+embedder through OpenRouter, while the official run used direct OpenAI.
+
+The guarded full mode now means exactly 97 tasks x trial 0. It requires the
+current subset gate, `ALLOW_FULL_RUN=1`, the two paid-run acknowledgements, and
+the reviewed full-corpus Modal drift acknowledgement. The one canonical launch
+command is:
 
 ```bash
 ALLOW_FULL_RUN=1 uv run --frozen --extra knowledge python \
   reproduction/tau3_banking/run.py full \
-  --output-dir reproduction/tau3_banking/runs/full_reproduction \
-  --execute --confirm-paid-api-calls --cost-ceiling-usd 300 \
+  --output-dir reproduction/tau3_banking/runs/qwen38_full_trial0_repeat \
+  --execute --confirm-paid-api-calls --cost-ceiling-usd 150 \
   --allow-known-full-shell-drift
 ```
+
+The ceiling is an acknowledgement against historical cost, not a provider hard
+cap. Resume only that same directory and immutable manifest by adding
+`--resume` to the command. Never copy or selectively rerun scored outcomes.
 
 The full guard hashes and parses the pinned live 4,614-command shell-oracle
 receipt, requires every nonzero mismatch to have a committed score-impact
@@ -259,23 +273,23 @@ in the execution manifest. These differences can affect model behavior and the
 score; acceptance authorizes a distribution-level reproduction, not exact
 trajectory parity. A missing, stale, truncated, or unreviewed receipt blocks
 full mode.
-Do not run this until subset mismatches have been understood. The historical
-cost excludes embeddings, NL judges, and Modal; provider prices can change, and
-retries can increase spend.
+The historical cost excludes embeddings, NL judges, and Modal; provider prices
+can change, and retries can increase spend.
 
-Afterward, write the bounded full comparison report:
+Afterward, compare every task, grading component, route, tool interaction, and
+trace against official trial 0:
 
 ```bash
 uv run --offline --frozen --extra knowledge python \
   reproduction/tau3_banking/compare_results.py \
-  reproduction/tau3_banking/runs/full_reproduction/results.json \
+  reproduction/tau3_banking/runs/qwen38_full_trial0_repeat/results.json \
   --mode full \
-  --output reproduction/tau3_banking/runs/full_reproduction/full_compare.json
+  --output reproduction/tau3_banking/runs/qwen38_full_trial0_repeat/parity.json
 ```
 
 The comparator remains strict and can exit 1 for per-task, tool, or participant
 text drift even when the exact aggregate is reproduced. For the declared full
-result, require `candidate_simulation_count=388`, `candidate_reward_sum=214`,
+result, require `candidate_simulation_count=97`, `candidate_reward_sum=54`,
 `aggregate_score_parity=true`, `candidate_grading_integrity=true`, and exact
 configuration, raw-route, judge-route, and execution-manifest parity. Strict
 mismatch fields remain part of the report and must not be relabeled as exact

@@ -2196,6 +2196,105 @@ def test_subset_trial0_is_a_ten_task_one_trial_intermediate(tmp_path):
     assert "--auto-resume" in command
 
 
+def test_full_is_the_exact_97_task_one_trial_contract(tmp_path):
+    config = json.loads((HARNESS_DIR / "reference.json").read_text(encoding="utf-8"))
+    mode = config["modes"]["full"]
+    command = reproduction_run.build_command(
+        config, "full", tmp_path / "run", resume=False
+    )
+    task_ids = command[command.index("--task-ids") + 1 :]
+
+    assert mode["task_ids"] == "all"
+    assert mode["trials"] == [0]
+    assert mode["expected_simulation_count"] == 97
+    assert mode["expected_reward_sum"] == 54
+    assert mode["expected_reward_by_trial"] == [54]
+    assert mode["expected_pass_rate"] == pytest.approx(100 * 54 / 97)
+    assert mode["historical_chat_cost_usd"] == pytest.approx(62.2505533)
+    assert command[command.index("--num-trials") + 1] == "1"
+    assert command[command.index("--max-concurrency") + 1] == "10"
+    assert len(task_ids) == 97
+    assert len(set(task_ids)) == 97
+    assert compare_results.expected_keys(config, "full") == [
+        (task_id, 0) for task_id in task_ids
+    ]
+
+
+def test_execution_manifest_accepts_only_proven_revalidation_head(
+    monkeypatch, tmp_path
+):
+    config_path = HARNESS_DIR / "reference.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    candidate_path = tmp_path / "results.json"
+    candidate = {"info": {"git_commit": "scoring-head"}, "simulations": []}
+    candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+    state_digest = "d" * 64
+    artifact_digest = "a" * 64
+    manifest = {
+        "mode": "smoke",
+        "dry_run": False,
+        "status": "completed",
+        "exit_code": 0,
+        "output_dir": str(tmp_path),
+        "reference_config_sha256": compare_results.digest_file(config_path),
+        "checkpoint_sha256": artifact_digest,
+        "execution_state": {
+            "digest": state_digest,
+            "runtime": {"head": "revalidation-head"},
+        },
+        "post_run_execution_state": {"digest": state_digest},
+        "environment": reproduction_run.expected_manifest_environment(config),
+        "prompt_hashes": reproduction_run.expected_prompt_hashes(config),
+        "command": reproduction_run.build_command(
+            config, "smoke", tmp_path, resume=False
+        ),
+        "openrouter_endpoint_inventory": _bound_endpoint_inventory(),
+    }
+    (tmp_path / "reproduction_manifest_smoke.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+    monkeypatch.setattr(
+        compare_results,
+        "evaluation_only_commit_delta",
+        lambda candidate_head, runtime_head: {
+            "candidate_commit": candidate_head,
+            "gate_writer_commit": runtime_head,
+            "changed_paths": ["reproduction/tau3_banking/compare_results.py"],
+        },
+    )
+    accepted = compare_results.validate_execution_manifest(
+        candidate_path,
+        candidate,
+        config,
+        compare_results.digest_file(config_path),
+        "smoke",
+        artifact_digest,
+    )
+    assert accepted["execution_manifest_parity"] is True
+    assert (
+        accepted["bound_openrouter_endpoint_inventory"]
+        == (manifest["openrouter_endpoint_inventory"])
+    )
+
+    def reject_delta(*_args):
+        raise reproduction_run.RunGuardError("non-evaluation runtime change")
+
+    monkeypatch.setattr(compare_results, "evaluation_only_commit_delta", reject_delta)
+    rejected = compare_results.validate_execution_manifest(
+        candidate_path,
+        candidate,
+        config,
+        compare_results.digest_file(config_path),
+        "smoke",
+        artifact_digest,
+    )
+    assert rejected["execution_manifest_parity"] is False
+    assert rejected["execution_manifest_mismatches"][
+        "execution_manifest.execution_state.runtime.head"
+    ] == {"expected": "scoring-head", "actual": "revalidation-head"}
+
+
 def test_subset_partial_resume_accepts_stale_one_trial_metadata_only_in_subset():
     target_trials = {0, 1, 2, 3}
 

@@ -2759,6 +2759,19 @@ def validate_execution_manifest(
     manifest = load_json(manifest_path)
     candidate_head = (candidate.get("info") or {}).get("git_commit")
     runtime = (manifest.get("execution_state") or {}).get("runtime") or {}
+    runtime_head = runtime.get("head")
+    expected_runtime_head = candidate_head
+    if runtime_head != candidate_head:
+        try:
+            evaluation_only_commit_delta(candidate_head, runtime_head)
+        except RunGuardError:
+            pass
+        else:
+            # A completed checkpoint may be revalidated by a later commit that
+            # changes only guarded evaluation/reporting code. The manifest then
+            # correctly binds the revalidation HEAD while the immutable result
+            # still records the original scoring HEAD.
+            expected_runtime_head = runtime_head
     execution_state_digest = (manifest.get("execution_state") or {}).get("digest")
     expected_config_digest = config_digest
     recorded_config_digest = manifest.get("reference_config_sha256")
@@ -2788,7 +2801,7 @@ def validate_execution_manifest(
         "output_dir": str(candidate_path.parent),
         "reference_config_sha256": expected_config_digest,
         "checkpoint_sha256": artifact_digest,
-        "execution_state.runtime.head": candidate_head,
+        "execution_state.runtime.head": expected_runtime_head,
         "post_run_execution_state.digest": execution_state_digest,
         "environment": canonical_environment,
         "prompt_hashes": expected_prompt_hashes(config),

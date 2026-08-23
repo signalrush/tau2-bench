@@ -1,0 +1,165 @@
+schema_version = 1
+status = "frozen"
+unresolved = []
+
+[benchmark]
+name = "tau3 banking_knowledge"
+domain = "banking_knowledge"
+repository_url = "https://github.com/sierra-research/tau2-bench"
+commit = "fc0055dc4e0a316c3f83133267fbd6faaa770992"
+task_manifest_url = "https://github.com/sierra-research/tau2-bench/blob/fc0055dc4e0a316c3f83133267fbd6faaa770992/data/tau2/domains/banking_knowledge/tasks.json"
+task_manifest_sha256 = "213c7f3e6dc0420b1184ee271e39e38c6ece3c43edfa362db49a560828ebd543"
+task_count = 97
+
+[official_result]
+url = "https://sierra-research.github.io/tau2-bench/leaderboard/"
+artifact_url = "https://sierra-tau-bench-public.s3.us-west-2.amazonaws.com/submissions/qwen3-8-max_sierra_2026-08-04/trajectories/banking_knowledge_results.json"
+artifact_sha256 = "8c8191c43dfb2d21c1322cc154740e5e6044151837ab817c2cbbcd13ffeb626e"
+metric = "trial-0 pass@1"
+score_form = "ratio"
+score_value = "54/97 (55.6701030927835%)"
+numerator = 54
+denominator = 97
+
+[[official_result.secondary_metrics]]
+name = "generated participant messages per simulation"
+value = "29.989690721649485"
+unit = "messages/simulation"
+definition = "2,909 raw-attributed assistant/user generations divided by 97 trial-0 simulations; excludes the fixed rawless greeting"
+source_url = "https://sierra-tau-bench-public.s3.us-west-2.amazonaws.com/submissions/qwen3-8-max_sierra_2026-08-04/trajectories/banking_knowledge_results.json"
+
+[[official_result.secondary_metrics]]
+name = "tool calls per simulation"
+value = "37.154639175257735"
+unit = "calls/simulation"
+definition = "3,604 assistant and user tool calls divided by 97 trial-0 simulations"
+source_url = "https://sierra-tau-bench-public.s3.us-west-2.amazonaws.com/submissions/qwen3-8-max_sierra_2026-08-04/trajectories/banking_knowledge_results.json"
+
+[[official_result.secondary_metrics]]
+name = "duration per simulation"
+value = "393.5312631304673"
+unit = "seconds/simulation"
+definition = "Arithmetic mean of the 97 serialized trial-0 simulation durations"
+source_url = "https://sierra-tau-bench-public.s3.us-west-2.amazonaws.com/submissions/qwen3-8-max_sierra_2026-08-04/trajectories/banking_knowledge_results.json"
+
+[[official_result.secondary_metrics]]
+name = "participant chat cost per simulation"
+value = "0.6417582814432989"
+unit = "USD/simulation"
+definition = "$62.2505533 serialized Qwen and GPT-5.2 cost divided by 97; excludes embeddings, NL judge, Modal, and failed retries"
+source_url = "https://sierra-tau-bench-public.s3.us-west-2.amazonaws.com/submissions/qwen3-8-max_sierra_2026-08-04/trajectories/banking_knowledge_results.json"
+
+[official.agent]
+model = "qwen/qwen3.8-max"
+model_url = "https://openrouter.ai/qwen/qwen3.8-max"
+resolved_model = "qwen/qwen3.8-max"
+provider = "Alibaba"
+endpoint = "Alibaba hosted route observed in every official response"
+endpoint_url = "https://openrouter.ai/qwen/qwen3.8-max/endpoints"
+reasoning_effort = "xhigh"
+thinking_mode = "returned for the current call, stripped from subsequent history"
+
+[official.agent.arguments.extra_body.reasoning]
+effort = "xhigh"
+
+[official.trace]
+artifact_url = "https://sierra-tau-bench-public.s3.us-west-2.amazonaws.com/submissions/qwen3-8-max_sierra_2026-08-04/trajectories/banking_knowledge_results.json"
+schema = "tau2 Message JSON with LiteLLM raw_data"
+tokenizer = "provider-managed and not exposed"
+tokenizer_url = "https://openrouter.ai/qwen/qwen3.8-max"
+tokenizer_revision = "not observable from the provider response"
+tokenizer_config_sha256 = "NOT_APPLICABLE"
+chat_template_url = "https://openrouter.ai/qwen/qwen3.8-max"
+chat_template_sha256 = "NOT_APPLICABLE"
+renderer = "tau2.to_litellm_messages -> LiteLLM/OpenRouter Chat Completions -> provider-managed template"
+renderer_arguments = { tool_choice = "auto" }
+thinking_field = "raw_data.choices[0].message.reasoning_content"
+thinking_policy = "strip_all_from_next_turn_history_preserve_in_raw_trace"
+tool_serialization = "OpenAI function tools; canonical JSON arguments"
+bos_eos_policy = "provider-managed and not exposed"
+
+[official.harness]
+repository_url = "https://github.com/sierra-research/tau2-bench"
+commit = "fc0055dc4e0a316c3f83133267fbd6faaa770992"
+command = "tau2 run --domain banking_knowledge --agent llm_agent --agent-llm openrouter/qwen/qwen3.8-max --user user_simulator --user-llm gpt-5.2 --retrieval-config alltools --num-trials 1 --max-steps 200 --max-errors 10 --max-concurrency 10 --seed 300"
+prompt_sha256 = "a097943f9b9d8823290804e39f852f842e570e0104bee39a77720ac0bca15b0d"
+tools_sha256 = "5e2d300ebc61227f1f79119768fe3c191a27896cbe844be7ccd49b0e9c271ae1"
+tool_manifest_url = "https://github.com/sierra-research/tau2-bench/tree/fc0055dc4e0a316c3f83133267fbd6faaa770992/src/tau2/domains/banking_knowledge"
+tool_count = 17
+tool_names = ["KB_search_bm25", "KB_search_dense", "shell", "transfer_to_human_agents", "get_current_time", "get_user_information_by_id", "get_user_information_by_name", "get_user_information_by_email", "change_user_email", "get_referrals_by_user", "get_credit_card_transactions_by_user", "get_credit_card_accounts_by_user", "log_verification", "give_discoverable_user_tool", "unlock_discoverable_agent_tool", "call_discoverable_agent_tool", "list_discoverable_agent_tools"]
+tool_choice = "auto"
+parallel_tool_calls = "not sent; provider default"
+max_steps = 200
+max_errors = 10
+
+[official.grading]
+url = "https://github.com/sierra-research/tau2-bench/tree/fc0055dc4e0a316c3f83133267fbd6faaa770992/src/tau2/evaluator"
+commit = "fc0055dc4e0a316c3f83133267fbd6faaa770992"
+command = "tau2 deterministic DB/ACTION/ENV evaluators; task_102 NL assertion judge"
+aggregation = "binary reward per task; arithmetic mean over 97 trial-0 tasks"
+trials = 1
+seeds = [626729]
+user_simulator = "gpt-5.2-2025-12-11, low reasoning, direct OpenAI"
+judge = "gpt-4.1-2025-04-14, temperature 0; task_102 only"
+
+[candidate]
+model = "openrouter/qwen/qwen3.8-max"
+resolved_model = "qwen/qwen3.8-max-20260803"
+provider = "Alibaba"
+endpoint = "sole active Alibaba endpoint"
+reasoning_effort = "xhigh"
+thinking_mode = "returned for the current call, stripped from subsequent history"
+credential_locator = "file:~/.rllm/config.json#api_keys.openrouter"
+
+[candidate.user_simulator]
+model = "openrouter/openai/gpt-5.2"
+provider = "OpenAI"
+reasoning_effort = "low"
+transport = "OpenRouter Chat Completions; differs from the official direct-OpenAI transport"
+
+[candidate.judge]
+model = "openrouter/openai/gpt-4.1-2025-04-14"
+provider = "OpenAI"
+temperature = 0.0
+scope = "task_102 only"
+transport = "OpenRouter; differs from the official direct-OpenAI transport"
+
+[candidate.retrieval]
+variant = "alltools"
+dense_model = "openai/text-embedding-3-large"
+transport = "OpenRouter with a pinned rebuilt cache; the official direct-OpenAI cache is unavailable"
+
+[candidate.arguments.extra_body.reasoning]
+effort = "xhigh"
+
+[candidate.harness]
+tools_sha256 = "5e2d300ebc61227f1f79119768fe3c191a27896cbe844be7ccd49b0e9c271ae1"
+tool_count = 17
+tool_names = ["KB_search_bm25", "KB_search_dense", "shell", "transfer_to_human_agents", "get_current_time", "get_user_information_by_id", "get_user_information_by_name", "get_user_information_by_email", "change_user_email", "get_referrals_by_user", "get_credit_card_transactions_by_user", "get_credit_card_accounts_by_user", "log_verification", "give_discoverable_user_tool", "unlock_discoverable_agent_tool", "call_discoverable_agent_tool", "list_discoverable_agent_tools"]
+tool_choice = "auto"
+parallel_tool_calls = "not sent; provider default"
+max_steps = 200
+max_errors = 10
+
+[candidate.trace]
+tokenizer = "provider-managed and not exposed"
+tokenizer_revision = "not observable from the provider response"
+tokenizer_config_sha256 = "NOT_APPLICABLE"
+chat_template_sha256 = "NOT_APPLICABLE"
+renderer = "tau2.to_litellm_messages -> LiteLLM/OpenRouter Chat Completions -> provider-managed template"
+renderer_arguments = { tool_choice = "auto" }
+thinking_field = "raw_data.choices[0].message.reasoning_content"
+thinking_policy = "strip_all_from_next_turn_history_preserve_in_raw_trace"
+tool_serialization = "OpenAI function tools; canonical JSON arguments"
+bos_eos_policy = "provider-managed and not exposed"
+
+[evaluation]
+launch_command = "ALLOW_FULL_RUN=1 uv run --frozen --extra knowledge python reproduction/tau3_banking/run.py full --output-dir reproduction/tau3_banking/runs/qwen38_full_trial0_repeat --execute --confirm-paid-api-calls --cost-ceiling-usd 150 --allow-known-full-shell-drift"
+smoke_task_ids = ["task_001"]
+task_concurrency = 10
+provider_concurrency = 10
+timeout_seconds = 3600
+cost_ceiling_usd = 150.0
+output_root = "reproduction/tau3_banking/runs"
+sandbox_backend = "modal"
+retry_infrastructure_only = true

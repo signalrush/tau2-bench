@@ -860,3 +860,45 @@
   reference-config digest that hashes the exact committed blob at the
   manifest's own runtime head under the modes.full-only proof, completing the
   evaluation-only delta handling for its receipts.
+
+## 2026-08-22 — agent-owned full-trace audit and contract reconciliation
+
+- Applied the merged `benchmark-parity` skill to the completed single-trial
+  checkpoint instead of treating its summary as a reproduction. Retrieved the
+  immutable Linux-host checkpoint and manifest into a temporary local audit
+  directory; their SHA-256 digests match the source exactly:
+  `6e50333ae5b13cac0048194ac6214ed7201e0a422dfb90a86d4c45dd6f06f3dc`
+  and `9a4003933b1554ffd6cf340ba819b4f5876cb993168ed734ced941a5cadaf5d3`.
+  No model, embedding, judge, or Modal call was made.
+- Exact score audit confirms **41/97**, not parity with official trial 0's
+  **54/97**. There are 23 task flips: five official failures became passes
+  (`008,014,057,074,102`) and 18 official passes became failures
+  (`033,034,040,043,044,051,054,055,056,059,070,071,073,078,079,089,093,094`).
+  Offline authoritative DB/ACTION/NL recomputation reports zero grading-
+  integrity issues, so the 13-point net gap is not a grader bug.
+- Trace audit shows a real mixture of hosted sampling and transport/retrieval
+  drift. For 39/97 tasks the first generated user message and the first Qwen
+  prompt-token count are both exactly equal to official, yet **0/39** first
+  Qwen outputs match despite the same Alibaba route, xhigh arguments, tools,
+  and seed. Seven of the 18 official-pass-to-fail tasks are in this identical-
+  first-input set. The other 11 begin with a different GPT-5.2 user response,
+  consistent with the accepted OpenRouter-vs-direct-OpenAI user transport gap.
+- Secondary metrics are close but not equal: candidate vs official generated
+  participant messages `2,987` vs `2,909`, tool calls `3,756` vs `3,604`, mean
+  duration `383.3251s` vs `393.5313s`, Qwen completion/reasoning tokens per
+  generation `661.55/508.95` vs `677.34/512.53`, and serialized participant
+  chat cost `$68.32762455` vs `$62.2505533`. Both traces use the same 20
+  observed tool names; the declared initial tool schema remains 17 tools with
+  SHA-256 `5e2d300ebc61227f1f79119768fe3c191a27896cbe844be7ccd49b0e9c271ae1`.
+- Reconciled the local branch with the nine published fork commits and removed
+  the duplicate `full_trial0` mode. `full` is the single canonical 97-task,
+  trial-zero mode. Its frozen historical credit requirement now uses the exact
+  official trial-zero serialized chat cost `$62.2505533`, rather than one
+  quarter of the four-trial aggregate. Added the skill's `benchmark.toml` and
+  corrected README commands/counts.
+- Fixed comparison provenance for an unchanged completed checkpoint that is
+  revalidated by a later evaluation-only commit: the manifest may bind the
+  revalidation HEAD only after `evaluation_only_commit_delta` proves every
+  intervening path is in the guarded allowlist. This keeps the original scoring
+  commit in the result while allowing the bound endpoint inventory to be
+  trusted for route validation; non-evaluation code drift remains fatal.
