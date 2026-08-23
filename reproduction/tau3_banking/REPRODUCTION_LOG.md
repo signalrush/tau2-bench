@@ -1091,3 +1091,101 @@
   preserve the 24 validated trajectories and retry only infrastructure-error
   and missing task keys. It must not start until the guarded credit preflight
   again covers the selected mode.
+||||||| parent of 84c84cb (docs: root-cause analysis of the 41-43/97 vs 54/97 deficit)
+## 2026-08-22 — trace analysis: the deficit is systematic, and its mechanism
+
+Two independent guarded single-trial runs (both `completed`, exit 0, same
+committed runtime, agent `openrouter/qwen/qwen3.8-max` effort `xhigh`, seed
+300):
+
+| run | score | cost |
+|---|---|---|
+| `full1t_c3887fe` | **41/97 = 42.27%** | $68.33 |
+| `qwen38_full_trial0_repeat` | **43/97 = 44.33%** | $73.70 |
+| official trial 0 | 54/97 = 55.67% | — |
+
+Official per-trial sums are `[54, 56, 51, 53]`. Under the official per-task
+rates the single-trial distribution has E=53.50, sd=2.69, so our two runs sit
+at z = −4.64 and −3.90; `P(single ≤ 43) = 9e-5` and `P(both ≤ 43) ≈ 1e-8`.
+**The gap is systematic, not sampling.** Run-to-run behaviour is otherwise
+normal: our A-vs-B per-task agreement is 75/97 (77.3%), essentially the same
+as official's own trial0-vs-trial1 agreement of 79/97 (81.4%).
+
+### The harness is not the cause
+
+Checked against the official artifact directly:
+
+- Agent system prompt/policy byte-identical for all 97 tasks (SHA-256
+  `a097943f9b9d8823…`); `agent_info` and `llm_args` identical.
+- Shell is healthier than the historical backend: 0.2% failing commands vs
+  official's 0.5%; fewer shell errors per task.
+- Retrieval yield identical: 9.5 documents per search call in both; our runs
+  see slightly *more* unique documents per task (49.1/50.5 vs 47.4).
+- User simulator comparable: 7.3/6.7 vs 7.0 user messages per task, ~305
+  characters and ~90 completion tokens in both.
+- Agent completion/reasoning token distributions match (mean 662/509 vs
+  677/513), ruling out provider-side reasoning degradation.
+- All 97 simulations `user_stop`, zero infrastructure errors, exact
+  Alibaba/OpenAI routes.
+
+### The cause: dense-retrieval drift against deliberately planted distractors
+
+The only remaining non-parity in the scored path is the embedding transport:
+the official run embedded through direct OpenAI, this reproduction must use
+OpenRouter. The measured drift is that only 65.8% of dense calls return the
+exact official top-10 ordering (1,188/1,806), even though aggregate score
+distributions are nearly identical (mean 0.5187 official vs 0.5179 ours).
+
+That modest ranking drift is score-decisive because `banking_knowledge` is
+engineered around near-duplicate documents whose selection flips the answer:
+
+- **task_070** (official passes 4/4; both our runs fail identically).
+  `doc_bank_accounts_bank_accounts_(general)_013` is ACTIVE 11/01–11/30 and
+  directs "recommend Sky Blue first"; `…_014` is EXPIRED 10/12–11/12 and
+  directs "recommend Lime Green, then Hunter Green". The simulated date is
+  2025-11-14. **Official retrieval surfaced `_013` four times and never
+  surfaced `_014` at all**; both our runs surfaced `_014` three times each.
+  Both our runs answered `account_class="Hunter Green"`; gold and official
+  answer `"Sky Blue"`.
+- **task_059** (official passes 4/4). `…_001` documents the convention
+  `'Green Account (checking)'` while `…_002` documents `'Silver Plus
+  Account', 'Gold Account'`. Both our runs wrote
+  `account_class="Green Account (savings)"`; gold is `"Green Account"`.
+
+The failure signature matches this mechanism rather than execution failure.
+Among DB-graded failures, "spurious write" (correct action, wrong argument)
+appears in 22.6% of ours versus 7.5% of official's; 16 of our 18 trial-0
+regressions are DB failures, and the concrete diffs are wrong product classes
+(`Purple`/`Gold` for `Silver Plus`, `Hunter Green` for `Sky Blue`), wrong
+knowledge-derived amounts (131.43 and 143.48 for gold 140.00), and wrong
+account IDs — not missing execution ability.
+
+Decisively, **4 of the 9 tasks that official passed and both our runs failed
+produce byte-identical wrong mutating-call sequences across two independent
+samples**. Independent sampling cannot produce identical wrong answers; a
+shared environment difference can.
+
+### Conclusion
+
+The reproduction does not reach the official number, and cannot while the
+OpenAI-embedding transport is out of scope. The harness reproduces the
+official configuration exactly; what it cannot reproduce is the official
+`text-embedding-3-large` document cache, and this benchmark's score is
+unusually sensitive to that cache because its corpus is built from
+conflicting near-duplicate documents. Expected reachable range on the current
+transport is ~42–44/97 (43.3% pooled) against an official 55.7%.
+
+Closing this out requires a billing-active direct-OpenAI key to rebuild the
+document cache on the official transport; that is the single remaining
+variable, and the harness already contains the direct-OpenAI code path
+(reverted to OpenRouter per owner direction, recoverable from commit
+`3930fbb`).
+
+### Spend
+
+OpenRouter credit is exhausted (−$8.00 at the time of writing). All paid
+processes were stopped. Recorded run costs this session: two full trial-0
+runs $68.33 + $73.70, the 40-run subset gate $10.77, the earlier subset
+$11.93, plus interrupted/partial runs. An interrupted four-trial full run
+(`full_6c4aa41`) was cancelled after the owner reduced scope to one trial;
+its in-flight simulations were paid for but not serialized.
