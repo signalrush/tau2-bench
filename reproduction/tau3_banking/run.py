@@ -776,6 +776,9 @@ def git_is_ancestor(ancestor: str, descendant: str) -> bool:
 EVALUATION_ONLY_GATE_PATHS = (
     "reproduction/tau3_banking/run.py",
     "reproduction/tau3_banking/compare_results.py",
+    # Human-readable parity contract. The guarded runner reads reference.json;
+    # benchmark.toml is never imported by the scored harness.
+    "reproduction/tau3_banking/benchmark.toml",
     # Separate guarded evaluation runner; it neither produces nor validates
     # the parity subset checkpoint.
     "reproduction/tau3_banking/run_nemotron_super.py",

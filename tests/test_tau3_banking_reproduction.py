@@ -3812,6 +3812,7 @@ def test_evaluation_only_commit_delta_accepts_only_evaluation_paths(monkeypatch)
         "git_output",
         lambda *args: (
             "reproduction/tau3_banking/compare_results.py\n"
+            "reproduction/tau3_banking/benchmark.toml\n"
             "tests/test_tau3_banking_reproduction.py\n"
             "reproduction/tau3_banking/REPRODUCTION_LOG.md"
         ),
@@ -3819,7 +3820,7 @@ def test_evaluation_only_commit_delta_accepts_only_evaluation_paths(monkeypatch)
     delta = reproduction_run.evaluation_only_commit_delta(candidate, head)
     assert delta["candidate_commit"] == candidate
     assert delta["runtime_head"] == head
-    assert len(delta["changed_paths"]) == 3
+    assert len(delta["changed_paths"]) == 4
 
     monkeypatch.setattr(
         reproduction_run,
